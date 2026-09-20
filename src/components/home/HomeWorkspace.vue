@@ -12,7 +12,7 @@ import {
   type RecentDocument
 } from '@/app/recent-files'
 import { openFileFromPath } from '@/app/shell/menu/use'
-import { openLibraryManagerDialog, openPublishLibraryDialog, useLibraryService } from '@/app/libraries'
+import { openLibraryAsFile, openPublishLibraryDialog, useLibraryService } from '@/app/libraries'
 import {
   activeStorageProviderID,
   storagePreferencesComplete,
@@ -390,7 +390,7 @@ function formattedDate(updatedAt: string): string {
             :metadata="files.libraryAssetCount({ count: library.assetCount })"
             :previewURL="libraryCoverURL(library.libraryId, library.latestRevisionId)"
             fallback-icon="icon-lucide-component"
-            @open="openLibraryManagerDialog('browse')"
+            @open="openLibraryAsFile(library.libraryId)"
           />
         </div>
 
@@ -405,7 +405,7 @@ function formattedDate(updatedAt: string): string {
             :name="library.name"
             :metadata="files.libraryAssetCount({ count: library.assetCount })"
             fallback-icon="icon-lucide-component"
-            @open="openLibraryManagerDialog('browse')"
+            @open="openLibraryAsFile(library.libraryId)"
           />
         </div>
 

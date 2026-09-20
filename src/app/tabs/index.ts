@@ -37,12 +37,14 @@ import { seedStorageCanvasFromRemote } from '@/app/storage/sync/persist'
 import { createFileOpenCoordinator } from '@/app/tabs/open/coordinator'
 import { findTabByFileIdentity } from '@/app/tabs/open/identity'
 
-export type TabKind = 'home' | 'document'
+export type TabKind = 'home' | 'document' | 'library'
 
 export interface Tab {
   id: string
   store: EditorStore
   kind: TabKind
+  /** Для вкладки библиотеки — её идентификатор (открыта на просмотр, не для работы). */
+  libraryId?: string
 }
 
 const io = new IORegistry(BUILTIN_IO_FORMATS)
@@ -95,9 +97,18 @@ export function getTabsSnapshot(): Tab[] {
   return [...tabsRef.value]
 }
 
-export function createTab(store?: EditorStore, initialGraph?: SceneGraph): Tab {
+export function createTab(
+  store?: EditorStore,
+  initialGraph?: SceneGraph,
+  meta: { kind?: TabKind; libraryId?: string } = {}
+): Tab {
   const s = store ?? createEditorStore(initialGraph)
-  const tab: Tab = { id: generateTabId(), store: s, kind: 'document' }
+  const tab: Tab = {
+    id: generateTabId(),
+    store: s,
+    kind: meta.kind ?? 'document',
+    ...(meta.libraryId ? { libraryId: meta.libraryId } : {})
+  }
   tabsRef.value = [...tabsRef.value, tab]
   activateTab(tab)
   return tab
@@ -279,6 +290,11 @@ function watchOpenedFigCover(path: string, store: EditorStore): void {
       })
     })
   )
+}
+
+/** Вкладка с открытой на просмотр библиотекой (если её уже открывали). */
+export function findTabByLibraryId(libraryId: string): Tab | undefined {
+  return tabsRef.value.find((tab) => tab.kind === 'library' && tab.libraryId === libraryId)
 }
 
 function findStorageTab(providerId: string, documentId: string): Tab | undefined {

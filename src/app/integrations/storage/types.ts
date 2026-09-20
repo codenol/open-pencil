@@ -78,6 +78,8 @@ export interface StorageAdapter {
     onProgress?: (progress: StorageTransferProgress) => void
   ): Promise<void>
   deleteDocument(id: string): Promise<void>
+  /** Переименование без повторной загрузки содержимого. */
+  renameDocument?(id: string, name: string): Promise<void>
   getDocumentMetadata?(id: string): Promise<StorageDocumentMetadata | null>
   getUsage(): Promise<StorageUsage>
   getThumbnail?(id: string): Promise<Uint8Array | null>
