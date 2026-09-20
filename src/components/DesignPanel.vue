@@ -10,6 +10,7 @@ import Tip from '@/components/ui/overlay/Tip.vue'
 import PanelHeader from '@/components/ui/panel/PanelHeader.vue'
 
 import AppearanceSection from './properties/AppearanceSection.vue'
+import ComponentDocsSection from './properties/ComponentDocsSection.vue'
 import ComponentPropertiesSection from './properties/component-properties/ComponentPropertiesSection.vue'
 import InstanceUpdateAction from './properties/component-properties/instance-update/InstanceUpdateAction.vue'
 import VariantAuthoringSection from './properties/component-properties/VariantAuthoringSection.vue'
@@ -185,6 +186,8 @@ const { panels } = useI18n()
       />
 
       <FramePresetSelect v-if="node.type === 'FRAME'" />
+
+      <ComponentDocsSection />
 
       <PositionSection />
       <ConstraintsSection />
