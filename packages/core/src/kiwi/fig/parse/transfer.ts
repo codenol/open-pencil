@@ -20,8 +20,14 @@ export interface SerializedSceneGraph extends PortableSceneGraphData {
   lazyFigImport?: SerializedLazyFigImportContext
 }
 
-export function serializeSceneGraph(graph: SceneGraph): SerializedSceneGraph {
-  const lazyFigImport = getLazyFigImportContext(graph)
+export function serializeSceneGraph(
+  graph: SceneGraph,
+  options: { includeLazySource?: boolean } = {}
+): SerializedSceneGraph {
+  // Сырьё для ленивой догрузки (changeMap/blobs) остаётся в воркере:
+  // в страницу едет только граф — иначе копия на больших файлах съедает гигабайты.
+  const lazyFigImport =
+    options.includeLazySource === false ? undefined : getLazyFigImportContext(graph)
   return {
     rootId: graph.rootId,
     nodes: [...graph.nodes],

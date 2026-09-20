@@ -57,6 +57,15 @@ export class RoutedLibraryCatalog implements LibraryCatalog {
     }
   }
 
+  async removeLibrary(libraryId: string): Promise<void> {
+    if (this.#source === 'local' || !this.#remote?.removeLibrary) {
+      await this.#local.removeLibrary(libraryId)
+      return
+    }
+    await this.#remote.removeLibrary(libraryId)
+    await this.#local.removeLibrary(libraryId)
+  }
+
   async publishRevision(input: PublishLibraryInput): Promise<ComponentLibraryRevision> {
     if (this.#source === 'local' || !this.#remote) return this.#local.publishRevision(input)
     const revision = await this.#remote.publishRevision(input)

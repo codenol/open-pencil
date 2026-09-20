@@ -3,6 +3,7 @@ import type { SceneNode, Vector } from '@open-pencil/scene-graph'
 import { getAxisAlignedWorldBounds, getWorldMatrix } from '@open-pencil/scene-graph/coordinate'
 import Matrix from '@open-pencil/scene-graph/matrix'
 
+import { restoreSubtree, snapshotSubtree } from '#core/editor/clipboard/subtree-history'
 import type { EditorContext } from '#core/editor/types'
 
 type InstanceCreateSnapshot = Partial<SceneNode> & { id: string }
@@ -119,5 +120,60 @@ export function createComponentInstanceActions(ctx: EditorContext) {
     })
   }
 
-  return { createInstanceFromComponent, detachInstance }
+  /**
+   * Перепривязка («замена главного компонента») для выделенных инстансов:
+   * каждый инстанс пересаживается на указанный компонент, дети синхронизируются.
+   * Работает и для «битых» инстансов, у которых главный компонент потерян.
+   */
+  function swapInstances(instanceIds: string[], componentId: string) {
+    const component = ctx.graph.getNode(componentId)
+    if (component?.type !== 'COMPONENT') return
+
+    const targets = instanceIds
+      .map((id) => ctx.graph.getNode(id))
+      .filter(
+        (node): node is SceneNode => node?.type === 'INSTANCE' && node.componentId !== componentId
+      )
+    if (targets.length === 0) return
+
+    const snapshots = new Map<string, Map<string, SceneNode>>()
+    for (const target of targets) {
+      snapshots.set(target.id, snapshotSubtree(ctx.graph, target.id))
+    }
+    const targetIds = new Set(targets.map((target) => target.id))
+    const previousSelection = new Set(ctx.state.selectedIds)
+
+    const apply = () => {
+      for (const target of targets) {
+        ctx.graph.swapInstanceComponent(target.id, componentId)
+      }
+      ctx.setSelectedIds(new Set(targetIds))
+      ctx.requestRender()
+    }
+
+    const inverse = () => {
+      for (const target of targets) {
+        const parentId = target.parentId
+        const snapshot = snapshots.get(target.id)?.get(target.id)
+        if (!parentId || !snapshot) continue
+        const subtree = snapshots.get(target.id)
+        if (!subtree) continue
+        if (ctx.graph.getNode(target.id)) {
+          ctx.graph.deleteNode(target.id)
+        }
+        restoreSubtree(ctx.graph, snapshot, parentId, subtree)
+      }
+      ctx.setSelectedIds(previousSelection)
+      ctx.requestRender()
+    }
+
+    apply()
+    ctx.undo.push({
+      label: 'Replace component',
+      forward: apply,
+      inverse
+    })
+  }
+
+  return { createInstanceFromComponent, detachInstance, swapInstances }
 }

@@ -100,6 +100,19 @@ export class LocalLibraryCatalog implements LibraryCatalog {
     await transaction.done
   }
 
+  async removeLibrary(libraryId: string): Promise<void> {
+    const database = await this.#database
+    const transaction = database.transaction(['revisions', 'latest'], 'readwrite')
+    await transaction.objectStore('latest').delete(libraryId)
+    const index = transaction.objectStore('revisions').index('by-library')
+    let cursor = await index.openCursor(libraryId)
+    while (cursor) {
+      await cursor.delete()
+      cursor = await cursor.continue()
+    }
+    await transaction.done
+  }
+
   async publishRevision(input: PublishLibraryInput): Promise<ComponentLibraryRevision> {
     const revision = await createLibraryRevision(input)
     const serializedRevision = serializeLibraryRevision(revision)

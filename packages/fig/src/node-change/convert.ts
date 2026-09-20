@@ -613,9 +613,53 @@ export function shouldImportTextAsAutoSize(
 
 export function nodeChangeToProps(
   nc: NodeChange,
-  blobs: Uint8Array[]
+  blobs: Uint8Array[],
+  mode: 'full' | 'skeleton' = 'full'
 ): Partial<SceneNode> & { nodeType: NodeType | 'DOCUMENT' | 'VARIABLE' } {
   const nodeType = resolveNodeType(nc)
+
+  // Скелетный режим: только структурные поля без тяжёлых (заливки, геометрия,
+  // текст/глифы, эффекты, данные плагинов). Для незагруженных страниц — как у Figma.
+  if (mode === 'skeleton') {
+    return {
+      nodeType,
+      name: nc.name ?? nodeType,
+      source: extractSourceMetadata(nc, blobs),
+      ...convertFigmaTransformProps(nc),
+      opacity: nc.opacity ?? 1,
+      visible: nc.visible ?? true,
+      locked: nc.locked ?? false,
+      blendMode: (nc.blendMode as Fill['blendMode']) ?? 'PASS_THROUGH',
+      booleanOperation: mapBooleanOperation(nc),
+      ...convertCornerProps(nc),
+      horizontalConstraint: mapConstraint(nc.horizontalConstraint as string),
+      verticalConstraint: mapConstraint(nc.verticalConstraint as string),
+      ...convertLayoutProps(nc),
+      minWidth: minimumSizeDimension(nc.minSize, 'x'),
+      maxWidth: maximumSizeDimension(nc.maxSize, 'x'),
+      minHeight: minimumSizeDimension(nc.minSize, 'y'),
+      maxHeight: maximumSizeDimension(nc.maxSize, 'y'),
+      isMask: nc.mask ?? false,
+      maskType: (nc.maskType ?? 'ALPHA') as 'ALPHA' | 'VECTOR' | 'LUMINANCE',
+      maskIsOutline: nc.maskIsOutline ?? false,
+      expanded: true,
+      autoRename: (nc.autoRename ?? true) as boolean,
+      clipsContent: nc.frameMaskDisabled === false && nc.resizeToFit !== true,
+      fillStyleId: styleRefId(nc.styleIdForFill),
+      strokeStyleId: styleRefId(nc.styleIdForStrokeFill),
+      textStyleId: styleRefId(nc.styleIdForText),
+      effectStyleId: styleRefId(nc.styleIdForEffect),
+      gridStyleId: styleRefId(nc.styleIdForGrid),
+      sharedStyleType: sharedStyleType(nc.styleType),
+      componentId: extractSymbolId(nc),
+      componentPropertyDefinitions: extractComponentPropertyDefs(nc),
+      componentPropertyReferences: extractComponentPropertyRefs(nc),
+      componentPropertyAssignments: extractComponentPropertyAssignments(nc),
+      componentPropertyValues: extractComponentPropertyValues(nc),
+      ...extractComponentMetadata(nc),
+      librarySource: extractLibrarySource(nc)
+    }
+  }
 
   const vectorAndStrokeProps = convertVectorAndStrokeProps(nc, blobs)
   const textPathData = convertTextPathData(nc, blobs)
@@ -1121,15 +1165,13 @@ function extractFigmaRawGeometry(
   nc: NodeChange,
   blobs: Uint8Array[]
 ): Pick<SceneNode['source']['fig'], 'rawSize' | 'rawTransform' | 'rawNodeFields'> {
-  const rawNodeFields: Record<string, unknown> = {}
-  for (const key of FIGMA_RAW_NODE_FIELD_KEYS) {
-    const value = nc[key]
-    if (value !== undefined) rawNodeFields[key] = preserveFigmaPayloadBlobs(value, blobs)
-  }
+  // Сырьё Figma (rawNodeFields) не храним: экспорт обратно в Figma не нужен,
+  // а на больших файлах оно съедает гигабайты памяти (2.5 ГБ на 10 МБ файл).
+  // Оставляем только размер/трансформ — они нужны лейаутам.
   return {
     rawSize: nc.size ? { ...nc.size } : null,
     rawTransform: nc.transform ? { ...nc.transform } : null,
-    rawNodeFields
+    rawNodeFields: {}
   }
 }
 
@@ -1151,7 +1193,7 @@ function extractFigmaSymbolMetadata(
       nc.componentPropAssignments ?? [],
       blobs
     ) as unknown[],
-    derivedSymbolData: preserveFigmaPayloadBlobs(nc.derivedSymbolData ?? [], blobs) as unknown[],
+    derivedSymbolData: [],
     derivedSymbolDataLayoutVersion:
       typeof nc.derivedSymbolDataLayoutVersion === 'number'
         ? nc.derivedSymbolDataLayoutVersion

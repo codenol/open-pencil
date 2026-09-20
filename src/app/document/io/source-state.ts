@@ -1,3 +1,5 @@
+import { shallowRef } from 'vue'
+
 import type { DocumentSourceIdentity } from '@/app/document/io/types'
 import type { StorageDocumentBinding } from '@/app/integrations/storage/types'
 
@@ -6,7 +8,9 @@ export function createDocumentSourceState() {
   let filePath: string | null = null
   let downloadName: string | null = null
   let sourceIdentity: DocumentSourceIdentity = { handle: null, path: null }
-  let storageBinding: StorageDocumentBinding | null = null
+  // Реактивно: адрес файла (/file/<id>) зависит от привязки к серверу, а она появляется
+  // уже после загрузки документа — URL должен обновиться.
+  const storageBinding = shallowRef<StorageDocumentBinding | null>(null)
   let savedVersion = 0
   let lastWriteTime = 0
 
@@ -27,9 +31,9 @@ export function createDocumentSourceState() {
     setSourceIdentity: (identity: DocumentSourceIdentity) => {
       sourceIdentity = identity
     },
-    getStorageBinding: () => storageBinding,
+    getStorageBinding: () => storageBinding.value,
     setStorageBinding: (binding: StorageDocumentBinding | null) => {
-      storageBinding = binding
+      storageBinding.value = binding
     },
     getSavedVersion: () => savedVersion,
     setSavedVersion: (version: number) => {

@@ -56,15 +56,18 @@ export function createSaveActions({
     const fileHandle = getFileHandle()
     const storageBinding = getStorageBinding()
     const downloadName = getDownloadName()
-    if (storageBinding || filePath || fileHandle) {
+    // Источник — веб-ссылка (только чтение): сохранить можно лишь скачиванием.
+    const remoteSource = !!filePath && /^https?:\/\//i.test(filePath)
+    if (!remoteSource && (storageBinding || filePath || fileHandle)) {
       const { data, version } = await buildVersionedFigFile()
       const wrote = await writeFile(data, version)
       if (wrote && !storageBinding) setSourceIdentity({ handle: fileHandle, path: filePath })
       return wrote
     }
-    if (downloadName) {
+    if (downloadName || remoteSource) {
       const { data, version } = await buildVersionedFigFile()
-      downloadBlob(new Uint8Array(data), downloadName, 'application/octet-stream')
+      const fileName = downloadName ?? `${state.documentName || 'Untitled'}.fig`
+      downloadBlob(new Uint8Array(data), fileName, 'application/octet-stream')
       await onDownloadSuccess?.(version)
       return true
     }

@@ -25,6 +25,7 @@ import MaskSection from './properties/MaskSection.vue'
 import PageSection from './properties/PageSection.vue'
 import RetainedPanel from './properties/panel/RetainedPanel.vue'
 import PositionSection from './properties/PositionSection.vue'
+import ReplaceComponentControl from './properties/ReplaceComponentControl.vue'
 import SelectionActionsControl from './properties/SelectionActionsControl.vue'
 import StrokeSection from './properties/stroke/StrokeSection.vue'
 import TypographySection from './properties/TypographySection.vue'
@@ -37,6 +38,14 @@ const libraryService = useLibraryService()
 const activeTool = computed(() => store.state.activeTool)
 const { selectedNode: node, selectedCount: multiCount } = useSelectionState()
 const showBooleanOperations = computed(() => multiCount.value >= 2)
+const selectedInstanceCount = computed(() => {
+  if (multiCount.value < 2) return 0
+  let count = 0
+  for (const id of store.state.selectedIds) {
+    if (store.graph.getNode(id)?.type === 'INSTANCE') count += 1
+  }
+  return count
+})
 const { getCommand } = useEditorCommands()
 const goToMainComponent = getCommand('selection.goToMainComponent')
 const detachInstance = getCommand('selection.detachInstance')
@@ -92,6 +101,15 @@ const { panels } = useI18n()
       </template>
     </PanelHeader>
     <ComponentPropertiesSection />
+    <div
+      v-if="selectedInstanceCount > 0"
+      class="flex flex-col gap-1 border-b border-border px-3 py-2"
+    >
+      <span class="px-2 text-[10px] uppercase tracking-wide text-muted">
+        {{ panels.replaceComponent }}
+      </span>
+      <ReplaceComponentControl />
+    </div>
     <PositionSection />
     <ConstraintsSection />
     <AppearanceSection />
@@ -148,6 +166,12 @@ const { panels } = useI18n()
         >
           {{ panels.detachInstance }}
         </button>
+        <div class="mt-1 flex flex-col gap-1">
+          <span class="px-2 text-[10px] uppercase tracking-wide text-muted">
+            {{ panels.replaceComponent }}
+          </span>
+          <ReplaceComponentControl />
+        </div>
       </div>
 
       <ComponentPropertiesSection v-if="node.type === 'INSTANCE'" />

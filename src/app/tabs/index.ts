@@ -488,6 +488,9 @@ export async function openFileInNewTab(
         console.warn('[Recent files] Failed to cache the Cover thumbnail', error)
       })
     }
+    // Сразу фиксируем черновик: адрес документа переживает перезагрузку даже
+    // для файлов, открытых из веб-ссылки (у них нет записываемого источника).
+    void store.persistRecoveryNow().catch(() => undefined)
     completion.resolve(undefined)
     succeeded = true
   } catch (error) {

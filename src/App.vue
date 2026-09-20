@@ -26,8 +26,11 @@ import AppToast from '@/components/shell/AppToast.vue'
 const store = useEditorStore()
 const { updates, locale } = useI18n()
 
+const buildLabel =
+  typeof __OPENPENCIL_BUILD__ === 'string' && __OPENPENCIL_BUILD__ ? ` (${__OPENPENCIL_BUILD__})` : ''
+
 useHead({
-  titleTemplate: (title) => (title ? `${title} — OpenPencil` : 'OpenPencil'),
+  titleTemplate: (title) => (title ? `${title} — OpenPencil${buildLabel}` : `OpenPencil${buildLabel}`),
   htmlAttrs: {
     lang: locale,
     'data-motion': computed(() => (animationsEnabled.value ? 'full' : 'off'))

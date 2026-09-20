@@ -20,9 +20,10 @@ import { nodeIcon } from '@/app/editor/icons'
 import { useLibraryService } from '@/app/libraries'
 import { openExternalLink } from '@/app/shell/ui'
 import AssetThumbnail from '@/components/assets-panel/AssetThumbnail.vue'
+import ComponentPreview from '@/components/properties/ComponentPreview.vue'
 import { findAssetPage } from '@/components/assets-panel/page'
-import LibraryManagerDialog from '@/components/libraries/LibraryManagerDialog.vue'
 import { useLibraryEntry } from '@/components/libraries/useLibraryEntry'
+import { openMatchDialog } from '@/app/matching/dialog'
 import AppButton from '@/components/ui/button/AppButton.vue'
 import { AppDialogRoot, useDialogUI } from '@/components/ui/dialog'
 import AppPlaceholder from '@/components/ui/feedback/AppPlaceholder.vue'
@@ -67,8 +68,6 @@ const query = ref('')
 const assetView = ref<AssetView>('grid')
 const detailsOpen = ref(false)
 const {
-  open: librariesOpen,
-  initialSection: libraryInitialSection,
   updateCount: libraryUpdateCount,
   openManager: openLibraries
 } = useLibraryEntry(editor, libraryService)
@@ -346,6 +345,14 @@ async function insertSelectedAsset() {
           {{ libraryUpdateCount }}
         </span>
       </AppButton>
+      <AppButton
+        v-bind="insertButton"
+        :aria-label="panels.matchTitle"
+        data-test-id="assets-match"
+        @click="openMatchDialog"
+      >
+        <icon-lucide-link-2 class="size-3.5" />
+      </AppButton>
       <SegmentedControl
         v-model="assetView"
         data-test-id="assets-view-toggle"
@@ -389,6 +396,15 @@ async function insertSelectedAsset() {
                   v-if="asset.componentId"
                   :node-id="asset.componentId"
                   :alt="`${asset.name} preview`"
+                  :size="
+                    assetView === 'grid' ? ASSET_GRID_THUMBNAIL_SIZE : ASSET_LIST_THUMBNAIL_SIZE
+                  "
+                />
+                <ComponentPreview
+                  v-else-if="asset.libraryId && asset.revisionId && asset.assetKey"
+                  :library-id="asset.libraryId"
+                  :revision-id="asset.revisionId"
+                  :asset-key="asset.assetKey"
                   :size="
                     assetView === 'grid' ? ASSET_GRID_THUMBNAIL_SIZE : ASSET_LIST_THUMBNAIL_SIZE
                   "
@@ -497,7 +513,6 @@ async function insertSelectedAsset() {
       </AppPlaceholder>
     </div>
 
-    <LibraryManagerDialog v-model="librariesOpen" :initial-section="libraryInitialSection" />
 
     <AppDialogRoot
       v-if="selectedAsset"

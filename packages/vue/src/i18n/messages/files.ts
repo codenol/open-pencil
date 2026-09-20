@@ -26,6 +26,14 @@ export const filesMessageDefaults = {
   clipboardImagesFetchFailed: params(
     'Failed to fetch {count} images from Figma. Check that the source file is accessible and try again.'
   ),
+  filesTitle: 'Files',
+  filesDescription: 'Files that live on the server — open from any device.',
+  noFiles: 'No files yet',
+  noFilesDescription: 'New designs appear here once saved to the server.',
+  libraries: 'Libraries',
+  librariesDescription: 'Published component libraries you can browse and use.',
+  noLibraries: 'No published libraries yet',
+  libraryAssetCount: params('Components: {count}'),
   recentFiles: 'Recent files',
   recentFilesDescription: 'Continue working on a design or start a new one.',
   noRecentFiles: 'No recent files yet',

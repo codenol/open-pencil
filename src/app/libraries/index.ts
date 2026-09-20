@@ -4,6 +4,11 @@ export type { LibraryCatalogSource } from './catalog/routed'
 export { StorageLibraryCatalog } from './catalog/storage'
 export { openPublishLibraryDialog, publishLibraryDialogOpen } from './publish/dialog'
 export {
+  libraryManagerDialogOpen,
+  libraryManagerInitialSection,
+  openLibraryManagerDialog
+} from './manager-dialog'
+export {
   readLibraryCatalogSource,
   readLibraryPriority,
   writeLibraryCatalogSource,

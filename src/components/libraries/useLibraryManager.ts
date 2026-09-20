@@ -93,11 +93,21 @@ export function useLibraryManager(
     service.setPriority(libraryId, priority + 1)
   }
 
-  async function updateAsset(group: LibraryAssetUpdateGroup) {
-    applying.value = `${group.libraryId}:${group.assetKey}`
+  async function updateSelectedGroups(groups: LibraryAssetUpdateGroup[]) {
+    if (groups.length === 0) return
+    applying.value =
+      groups.length === 1
+        ? `${groups[0].libraryId}:${groups[0].assetKey}`
+        : `selected:${groups.length}`
     try {
       await runOperation(async () => {
-        await service.applyUpdateGroups(editor, [group], `Update ${group.name}`)
+        await service.applyUpdateGroups(
+          editor,
+          groups,
+          groups.length === 1
+            ? `Update ${groups[0].name}`
+            : `Update ${groups.length} library assets`
+        )
         await refresh()
       })
     } finally {
@@ -105,20 +115,12 @@ export function useLibraryManager(
     }
   }
 
-  async function updateAll() {
-    applying.value = 'all'
-    try {
-      await runOperation(async () => {
-        await service.applyUpdateGroups(
-          editor,
-          visibleUpdateGroups.value,
-          'Update all library assets'
-        )
-        await refresh()
-      })
-    } finally {
-      applying.value = null
-    }
+  function updateAsset(group: LibraryAssetUpdateGroup) {
+    return updateSelectedGroups([group])
+  }
+
+  function updateAll() {
+    return updateSelectedGroups(visibleUpdateGroups.value)
   }
 
   watch(
@@ -130,7 +132,13 @@ export function useLibraryManager(
   )
 
   const source = readLibraryCatalogSource()
-  if (source === 'storage' && !open.value) void setSource('storage')
+  if (
+    source === 'storage' &&
+    !open.value &&
+    service.catalogSource !== 'storage' &&
+    storagePreferencesComplete(activeStorageProviderID.value)
+  )
+    void setSource('storage')
 
   return {
     section,
@@ -143,6 +151,7 @@ export function useLibraryManager(
     toggleLibrary,
     preferLibrary,
     updateAsset,
-    updateAll
+    updateAll,
+    updateSelectedGroups
   }
 }

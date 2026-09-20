@@ -1,5 +1,6 @@
 import { defineStorageProvider, StorageProviderRegistry } from './registry'
 import { createS3StorageAdapter } from './s3/adapter'
+import { createServerStorageAdapter } from './server/adapter'
 
 export const S3_STORAGE_PROVIDER = defineStorageProvider({
   id: 's3-compatible',
@@ -17,4 +18,16 @@ export const S3_STORAGE_PROVIDER = defineStorageProvider({
   createAdapter: createS3StorageAdapter
 })
 
-export const storageProviderRegistry = new StorageProviderRegistry([S3_STORAGE_PROVIDER])
+export const SERVER_STORAGE_PROVIDER = defineStorageProvider({
+  id: 'norka-server',
+  label: 'Norka server',
+  description: 'Файлы и библиотеки на сервере команды',
+  preferenceFields: [],
+  credentialFields: [],
+  createAdapter: createServerStorageAdapter
+})
+
+export const storageProviderRegistry = new StorageProviderRegistry([
+  SERVER_STORAGE_PROVIDER,
+  S3_STORAGE_PROVIDER
+])

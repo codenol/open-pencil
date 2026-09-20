@@ -1,11 +1,13 @@
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 import type { EditorStore } from '@/app/editor/session'
+import {
+  libraryManagerDialogOpen as open,
+  libraryManagerInitialSection as initialSection
+} from '@/app/libraries'
 import type { LibraryService } from '@/app/libraries'
 
 export function useLibraryEntry(editor: EditorStore, service: LibraryService) {
-  const open = ref(false)
-  const initialSection = ref<'browse' | 'updates'>('browse')
   const updateCount = computed(() => {
     const outdatedBindings = service.summaries.value.filter((summary) => {
       const binding = editor.graph.enabledLibraries.get(summary.libraryId)

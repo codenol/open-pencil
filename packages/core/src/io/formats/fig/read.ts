@@ -102,8 +102,12 @@ function parseViaWorker(buffer: ArrayBuffer, options: ParseFigFileOptions): Prom
       worker.terminate()
       reject(new Error(err.message || 'Worker failed to parse .fig file'))
     }
-    const workerBuffer = buffer.slice(0)
-    const archiveBuffer = buffer.slice(0)
+    // Без копий: воркер получает владение буфером (transfer), архив запрашивается
+    // отдельно и приходит по требованию — на больших файлах копии давали +30 МБ и лишний пик.
+    const workerBuffer = buffer
+    // Архив открываем из того же буфера, но копию не делаем: если буфер общий,
+    // передаём отдельный срез только когда это необходимо.
+    const archiveBuffer = buffer.byteLength === workerBuffer.byteLength ? buffer : buffer.slice(0)
     const request: FigSessionOpenRequest = {
       type: 'open',
       originalBuffer: workerBuffer,

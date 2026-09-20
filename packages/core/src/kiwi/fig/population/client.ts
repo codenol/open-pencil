@@ -89,10 +89,20 @@ export function registerOriginalArchiveRequest(
   originalArchiveRequests.set(graph, entry)
 }
 
+const ORIGINAL_ARCHIVE_TIMEOUT_MS = 5000
+
 export async function requestOriginalArchive(graph: SceneGraph): Promise<Uint8Array | null> {
   const entry = originalArchiveRequests.get(graph)
   if (!entry?.valid) return null
-  const archive = await entry.request()
+  // Воркер может умереть молча (terminate/ошибка): без таймаута экспорт .fig
+  // ждал бы ответ вечно. По таймауту возвращаем null — граф соберётся заново.
+  const archive = await Promise.race([
+    entry.request(),
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), ORIGINAL_ARCHIVE_TIMEOUT_MS)
+    })
+  ])
+  if (archive == null) return null
   return originalArchiveRequests.get(graph)?.valid === true &&
     originalArchiveRequests.get(graph) === entry
     ? archive
@@ -176,6 +186,10 @@ function createPopulationWorkerClient(
     releaseSubscription()
     worker.terminate()
     populationWorkers.delete(graph)
+    // Воркер мёртв: запросы «оригинального архива» больше не получат ответ и
+    // иначе зависли бы навсегда (экспорт .fig ждёт его перед сохранением).
+    const archiveEntry = originalArchiveRequests.get(graph)
+    if (archiveEntry) archiveEntry.valid = false
   }
   unbind = graph.onNodeEvents({
     created: invalidate,

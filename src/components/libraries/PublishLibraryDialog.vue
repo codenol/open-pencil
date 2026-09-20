@@ -11,6 +11,9 @@ import { useI18n } from '@open-pencil/vue'
 
 import { useEditorStore } from '@/app/editor/active-store'
 import { publishLibraryDialogOpen, useLibraryService } from '@/app/libraries'
+import { rememberLibrarySource } from '@/app/libraries/sources'
+import { activeTab } from '@/app/tabs'
+import { documentUrlKey } from '@/app/url/sync'
 import AppButton from '@/components/ui/button/AppButton.vue'
 import { AppDialogFooter, AppDialogHeader, AppDialogRoot } from '@/components/ui/dialog'
 import AppPlaceholder from '@/components/ui/feedback/AppPlaceholder.vue'
@@ -112,12 +115,17 @@ async function publish() {
   publishing.value = true
   error.value = ''
   try {
-    await service.publishSelected(editor, {
+    const revision = await service.publishSelected(editor, {
       libraryId: id,
       name,
       description: description.value,
       selectedAssetKeys: selectedKeys.value
     })
+    // Запоминаем файл-источник: из «Управления библиотеками» его можно будет открыть и поправить.
+    const tab = activeTab.value
+    if (tab && tab.kind === 'document') {
+      rememberLibrarySource(revision.manifest.libraryId, documentUrlKey(tab), revision.manifest.name)
+    }
     publishLibraryDialogOpen.value = false
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : panels.value.libraryPublishFailed

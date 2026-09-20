@@ -1,16 +1,9 @@
 <script setup lang="ts">
 import { useLocalStorage } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import { useDocumentWorkspace, useI18n, useViewportKind } from '@open-pencil/vue'
 
-import {
-  activeStorageProviderID,
-  readStoragePreferences,
-  storagePreferencesComplete,
-  storageProviderRegistry,
-  type StorageDocument
-} from '@/app/integrations/storage'
 import {
   clearRecentFiles,
   forgetRecentDocument,
@@ -18,23 +11,28 @@ import {
   recentFiles,
   type RecentDocument
 } from '@/app/recent-files'
-import { openSettingsDialog } from '@/app/settings/dialog'
 import { openFileFromPath } from '@/app/shell/menu/use'
+import { openLibraryManagerDialog, useLibraryService } from '@/app/libraries'
+import {
+  activeStorageProviderID,
+  storagePreferencesComplete,
+  type StorageDocument
+} from '@/app/integrations/storage'
 import { createStorageWorkspaceSource } from '@/app/storage/workspace/source'
 import { openStorageDocumentInNewTab } from '@/app/tabs'
 import DocumentEntry from '@/components/home/document/DocumentEntry.vue'
+import { libraryCoverPreviewUrl } from '@/components/properties/component-preview'
 import HomeSearchActions from '@/components/home/search/HomeSearchActions.vue'
 import AppButton from '@/components/ui/button/AppButton.vue'
 import IconButton from '@/components/ui/button/IconButton.vue'
 import SegmentedControl from '@/components/ui/select/SegmentedControl.vue'
 
 const emit = defineEmits<{ 'new-document': [] }>()
-const { panels, locale, storage, files, common, settings } = useI18n()
+const { panels, locale, files, common } = useI18n()
 const { isMobile } = useViewportKind()
 const view = useLocalStorage<'grid' | 'list'>('open-pencil:home-files-view', 'grid')
 const query = ref('')
 const openError = ref<string | null>(null)
-const storageConfigured = ref(storagePreferencesComplete(activeStorageProviderID.value))
 
 const workspace = useDocumentWorkspace<RecentDocument>({
   source: {
@@ -45,7 +43,7 @@ const workspace = useDocumentWorkspace<RecentDocument>({
       const document = recentFiles.value.find((candidate) => candidate.id === documentId)
       if (!document) return Promise.resolve(null)
       if (document.kind === 'local') return loadRecentFileThumbnail(document.path)
-      return createStorageWorkspaceSource(() => undefined).loadPreview(document.documentId)
+      return Promise.resolve(null)
     }
   },
   refreshOnFocus: false,
@@ -57,41 +55,6 @@ const documents = workspace.documents
 const previewURL = workspace.previewURL
 const vWorkspacePreview = workspace.previewDirective
 
-const storageWorkspace = useDocumentWorkspace<StorageDocument>({
-  source: createStorageWorkspaceSource((snapshot) => {
-    storageConfigured.value = snapshot.configured
-  }),
-  refreshInterval: 60_000,
-  previewConcurrency: 6
-})
-const storageDocuments = storageWorkspace.documents
-const storageLoading = storageWorkspace.loading
-const storageError = computed(() => {
-  const error = storageWorkspace.error.value
-  if (error == null) return null
-  return error instanceof Error ? error.message : String(error)
-})
-const storageDescription = computed(() => {
-  const provider = storageProviderRegistry.get(activeStorageProviderID.value)
-  const preferences = readStoragePreferences(activeStorageProviderID.value)
-  const bucket = preferences.bucket?.trim()
-  const endpoint = preferences.endpoint?.trim()
-  let label = provider.label
-  if (endpoint) {
-    try {
-      const hostname = new URL(endpoint).hostname
-      if (hostname.endsWith('.r2.cloudflarestorage.com')) label = storage.value.providerR2
-      else if (hostname.includes('amazonaws.com')) label = storage.value.providerAmazonS3
-      else if (hostname.includes('backblazeb2.com')) label = storage.value.providerBackblaze
-      else if (hostname) label = storage.value.providerS3
-    } catch {
-      label = provider.label
-    }
-  }
-  return bucket ? `${label} · ${bucket}` : label
-})
-const storagePreviewURL = storageWorkspace.previewURL
-const vStoragePreview = storageWorkspace.previewDirective
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase(locale.value))
 const filteredRecentFiles = computed(() => {
   if (!normalizedQuery.value) return documents.value
@@ -101,12 +64,59 @@ const filteredRecentFiles = computed(() => {
       .includes(normalizedQuery.value)
   )
 })
+const libraryService = useLibraryService()
+const libraries = computed(() => libraryService.summaries.value)
+const libraryCovers = ref<Record<string, string | null>>({})
+
+function libraryCoverURL(libraryId: string, revisionId: string): string | null {
+  if (!(libraryId in libraryCovers.value)) {
+    libraryCovers.value[libraryId] = null
+    void libraryCoverPreviewUrl(libraryId, revisionId).then((url) => {
+      if (url) libraryCovers.value = { ...libraryCovers.value, [libraryId]: url }
+    })
+  }
+  return libraryCovers.value[libraryId] ?? null
+}
+
+const filteredLibraries = computed(() => {
+  if (!normalizedQuery.value) return libraries.value
+  return libraries.value.filter((library) =>
+    library.name.toLocaleLowerCase(locale.value).includes(normalizedQuery.value)
+  )
+})
+
+onMounted(() => {
+  void libraryService.listLibraries()
+})
+
+const serverFilesConfigured = ref(storagePreferencesComplete(activeStorageProviderID.value))
+
+const storageWorkspace = useDocumentWorkspace<StorageDocument>({
+  source: createStorageWorkspaceSource((snapshot) => {
+    serverFilesConfigured.value = snapshot.configured
+  }),
+  refreshOnFocus: false,
+  refreshOnReconnect: true,
+  previewConcurrency: 6
+})
+
+const storageDocuments = storageWorkspace.documents
+const storageLoading = storageWorkspace.loading
+const storageError = computed(() => {
+  const error = storageWorkspace.error.value
+  if (!error) return null
+  return error instanceof Error ? error.message : String(error)
+})
+const storagePreviewURL = storageWorkspace.previewURL
+const vStoragePreview = storageWorkspace.previewDirective
+
 const filteredStorageDocuments = computed(() => {
   if (!normalizedQuery.value) return storageDocuments.value
   return storageDocuments.value.filter((document) =>
     document.name.toLocaleLowerCase(locale.value).includes(normalizedQuery.value)
   )
 })
+
 const hasRecentFiles = computed(() => documents.value.length > 0)
 const noSearchMatches = computed(
   () =>
@@ -124,21 +134,17 @@ async function openRecent(document: RecentDocument): Promise<void> {
       await openFileFromPath(document.path)
       return
     }
-    const storageDocument = storageDocuments.value.find(
-      (candidate) => candidate.id === document.documentId
-    )
-    await openStorageDocumentInNewTab(
-      storageDocument ?? {
-        id: document.documentId,
-        name: document.name,
-        updatedAt: document.updatedAt
-      }
-    )
+    await openStorageDocumentInNewTab({
+      id: document.documentId,
+      name: document.name,
+      updatedAt: document.updatedAt
+    })
   } catch (error) {
     forgetRecentDocument(document.id)
     openError.value = error instanceof Error ? error.message : String(error)
   }
 }
+
 
 async function openStorageDocument(document: StorageDocument): Promise<void> {
   openError.value = null
@@ -173,6 +179,88 @@ function formattedDate(updatedAt: string): string {
       >
         {{ files.noMatchingFiles({ query: query.trim() }) }}
       </p>
+
+      <section v-if="!noSearchMatches" class="mb-7">
+        <div class="mb-3 flex items-start gap-3">
+          <div class="min-w-0">
+            <h1 class="text-base font-semibold">{{ files.filesTitle }}</h1>
+            <p class="mt-0.5 text-xs text-muted">{{ files.filesDescription }}</p>
+          </div>
+          <div class="ml-auto flex shrink-0 items-center gap-1">
+            <IconButton
+              :label="common.refresh"
+              class="size-10 sm:size-7"
+              data-test-id="server-files-refresh"
+              @click="storageWorkspace.refresh"
+            >
+              <icon-lucide-refresh-cw class="size-3.5" />
+            </IconButton>
+          </div>
+        </div>
+
+        <div
+          v-if="storageLoading && storageDocuments.length === 0"
+          class="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"
+        >
+          <div
+            v-for="index in 3"
+            :key="index"
+            class="min-w-0 animate-pulse motion-reduce:animate-none"
+          >
+            <div class="aspect-video rounded-lg border border-border bg-panel-field" />
+            <div class="mt-2 h-3 w-2/3 rounded bg-panel-field" />
+            <div class="mt-1.5 h-2.5 w-1/3 rounded bg-panel-field" />
+          </div>
+        </div>
+
+        <div
+          v-else-if="storageError && storageDocuments.length === 0"
+          class="rounded-lg border border-danger/40 px-4 py-6 text-center"
+          role="alert"
+        >
+          <p class="text-xs text-danger">{{ storageError }}</p>
+          <AppButton variant="outline" class="mt-3" @click="storageWorkspace.refresh">
+            {{ common.refresh }}
+          </AppButton>
+        </div>
+
+        <div
+          v-else-if="filteredStorageDocuments.length && view === 'grid'"
+          class="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"
+        >
+          <DocumentEntry
+            v-for="document in filteredStorageDocuments"
+            :key="document.id"
+            v-storage-preview="document.id"
+            :name="document.name"
+            :metadata="formattedDate(document.updatedAt)"
+            :previewURL="storagePreviewURL(document.id)"
+            @open="openStorageDocument(document)"
+          />
+        </div>
+
+        <div
+          v-else-if="filteredStorageDocuments.length"
+          class="overflow-hidden rounded-lg border border-border"
+        >
+          <DocumentEntry
+            v-for="document in filteredStorageDocuments"
+            :key="document.id"
+            view="list"
+            :name="document.name"
+            :metadata="formattedDate(document.updatedAt)"
+            @open="openStorageDocument(document)"
+          />
+        </div>
+
+        <div
+          v-else-if="!normalizedQuery"
+          class="rounded-lg border border-dashed border-border px-4 py-4 text-center sm:py-6"
+        >
+          <p class="text-xs font-medium">{{ files.noFiles }}</p>
+          <p class="mt-1 text-xs text-muted">{{ files.noFilesDescription }}</p>
+        </div>
+      </section>
 
       <section v-if="!noSearchMatches">
         <div class="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
@@ -249,102 +337,49 @@ function formattedDate(updatedAt: string): string {
       <section class="mt-7">
         <div class="mb-3 flex items-start gap-3">
           <div class="min-w-0">
-            <h2 class="text-base font-semibold">{{ storage.workspace }}</h2>
-            <p class="mt-0.5 truncate text-xs text-muted sm:whitespace-normal">
-              {{ storageDescription }}
-            </p>
-          </div>
-          <div class="ml-auto flex shrink-0 items-center gap-1">
-            <IconButton
-              :label="common.refresh"
-              class="size-10 sm:size-7"
-              @click="storageWorkspace.refresh"
-            >
-              <icon-lucide-refresh-cw class="size-3.5" />
-            </IconButton>
-            <IconButton
-              :label="settings.title"
-              class="size-10 sm:size-7"
-              @click="openSettingsDialog('storage')"
-            >
-              <icon-lucide-settings-2 class="size-3.5" />
-            </IconButton>
+            <h2 class="text-base font-semibold">{{ files.libraries }}</h2>
+            <p class="mt-0.5 text-xs text-muted">{{ files.librariesDescription }}</p>
           </div>
         </div>
 
         <div
-          v-if="storageLoading && storageDocuments.length === 0"
-          class="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"
-          :aria-label="storage.loadingWorkspace"
-        >
-          <div
-            v-for="index in 3"
-            :key="index"
-            class="min-w-0 animate-pulse motion-reduce:animate-none"
-          >
-            <div class="aspect-video rounded-lg border border-border bg-panel-field" />
-            <div class="mt-2 h-3 w-2/3 rounded bg-panel-field" />
-            <div class="mt-1.5 h-2.5 w-1/3 rounded bg-panel-field" />
-          </div>
-        </div>
-
-        <div
-          v-else-if="storageError && storageDocuments.length === 0"
-          class="rounded-lg border border-danger/40 px-4 py-6 text-center"
-          role="alert"
-        >
-          <p class="text-xs text-danger">{{ storageError }}</p>
-          <AppButton variant="outline" class="mt-3" @click="storageWorkspace.refresh">
-            {{ common.refresh }}
-          </AppButton>
-        </div>
-
-        <div
-          v-else-if="filteredStorageDocuments.length && view === 'grid'"
+          v-if="filteredLibraries.length && view === 'grid'"
           class="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"
         >
           <DocumentEntry
-            v-for="document in filteredStorageDocuments"
-            :key="document.id"
-            v-storage-preview="document.id"
-            :name="document.name"
-            :metadata="formattedDate(document.updatedAt)"
-            :previewURL="storagePreviewURL(document.id)"
-            @open="openStorageDocument(document)"
+            v-for="library in filteredLibraries"
+            :key="library.libraryId"
+            :name="library.name"
+            :metadata="files.libraryAssetCount({ count: library.assetCount })"
+            :previewURL="libraryCoverURL(library.libraryId, library.latestRevisionId)"
+            fallback-icon="icon-lucide-component"
+            @open="openLibraryManagerDialog('browse')"
           />
         </div>
 
         <div
-          v-else-if="filteredStorageDocuments.length"
+          v-else-if="filteredLibraries.length"
           class="overflow-hidden rounded-lg border border-border"
         >
           <DocumentEntry
-            v-for="document in filteredStorageDocuments"
-            :key="document.id"
+            v-for="library in filteredLibraries"
+            :key="library.libraryId"
             view="list"
-            :name="document.name"
-            :metadata="formattedDate(document.updatedAt)"
-            @open="openStorageDocument(document)"
+            :name="library.name"
+            :metadata="files.libraryAssetCount({ count: library.assetCount })"
+            fallback-icon="icon-lucide-component"
+            @open="openLibraryManagerDialog('browse')"
           />
-        </div>
-
-        <div
-          v-else-if="!storageConfigured"
-          class="rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted sm:py-6"
-        >
-          <p>{{ storage.notConfigured }}</p>
-          <AppButton variant="outline" class="mt-3" @click="openSettingsDialog('storage')">
-            {{ settings.title }}
-          </AppButton>
         </div>
 
         <div
           v-else-if="!normalizedQuery"
-          class="rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted sm:py-6"
+          class="rounded-lg border border-dashed border-border px-4 py-4 text-center sm:py-6"
         >
-          {{ storage.emptyStorageWorkspace }}
+          <p class="text-xs font-medium">{{ files.noLibraries }}</p>
         </div>
       </section>
+
     </section>
   </main>
 </template>

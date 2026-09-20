@@ -78,6 +78,14 @@ export function deserializeInstanceOverrideState(state: unknown): InstanceOverri
 }
 
 export function cloneInstanceOverrideState(state: InstanceOverrideState): InstanceOverrideState {
+  if (
+    !state ||
+    !(state.self instanceof Map) ||
+    !(state.descendants instanceof Map)
+  ) {
+    // Данные пришли в сериализованном (или повреждённом) виде — нормализуем.
+    return deserializeInstanceOverrideState(state)
+  }
   return {
     self: new Map([...state.self].map(([field, value]) => [field, structuredClone(value)])),
     descendants: new Map(
