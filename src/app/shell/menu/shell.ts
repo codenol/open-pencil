@@ -6,7 +6,6 @@ import { setSnappingPreference } from '@/app/settings/preferences/apply'
 import { syncNativeSnappingMenu } from '@/app/settings/preferences/native-menu'
 import { appPreferences } from '@/app/settings/preferences/store'
 import { useNativeMenuEvents } from '@/app/shell/menu/native-events'
-import { openStorageWorkspace } from '@/app/shell/menu/navigation'
 import { APP_MENU_SCHEMA, type AppMenuEntry } from '@/app/shell/menu/schema'
 import { useAppTheme } from '@/app/shell/theme'
 import { checkForAppUpdate } from '@/app/shell/updater'
@@ -37,9 +36,6 @@ export function useShellMenu() {
   const { setTheme } = useAppTheme()
   const { updates } = useI18n()
   const actions: Partial<Record<string, () => void>> = {
-    'open-storage-workspace': () => {
-      void import('@/router').then(({ default: router }) => openStorageWorkspace(router))
-    },
     settings: openSettingsDialog,
     'snap-geometry': () => {
       const current = appPreferences.value.editing.snapping.geometry

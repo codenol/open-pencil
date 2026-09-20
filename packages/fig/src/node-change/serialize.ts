@@ -427,11 +427,11 @@ function serializeGeometry(node: SceneNode, nc: KiwiNodeChange, blobs: Uint8Arra
       const blobIdx = blobs.length
       blobs.push(geometry.commandsBlob)
       if (!geometry.fills || geometry.fills.length === 0) {
-        return { windingRule: geometry.windingRule, commandsBlob: blobIdx }
+        return { windingRule: toKiwiWindingRule(geometry.windingRule), commandsBlob: blobIdx }
       }
       const styleID = styleOverrides.length + 1
       styleOverrides.push({ styleID, fillPaints: geometry.fills.map(fillToKiwiPaint) })
-      return { windingRule: geometry.windingRule, commandsBlob: blobIdx, styleID }
+      return { windingRule: toKiwiWindingRule(geometry.windingRule), commandsBlob: blobIdx, styleID }
     })
   }
 
@@ -442,9 +442,16 @@ function serializeGeometry(node: SceneNode, nc: KiwiNodeChange, blobs: Uint8Arra
     nc.strokeGeometry = node.strokeGeometry.map((g) => {
       const blobIdx = blobs.length
       blobs.push(g.commandsBlob)
-      return { windingRule: g.windingRule, commandsBlob: blobIdx }
+      return { windingRule: toKiwiWindingRule(g.windingRule), commandsBlob: blobIdx }
     })
   }
+}
+
+// kiwi-схема Figma: enum WindingRule { NONZERO = 0, ODD = 1 }.
+// Наш маппинг согласован с vector-network.ts (байт 0 = 'EVENODD'):
+// при round-trip байты не меняются. TODO: сверить семантику с рендером Figma.
+function toKiwiWindingRule(rule: string): 'NONZERO' | 'ODD' {
+  return rule === 'EVENODD' ? 'NONZERO' : 'ODD'
 }
 
 function serializeVariableBindings(

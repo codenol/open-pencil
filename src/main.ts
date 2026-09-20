@@ -5,12 +5,14 @@ import { createRetainedScopePlugin } from '@open-pencil/vue'
 
 import './app.css'
 import { preloadFonts } from '@/app/editor/fonts'
+import { sanitizeLibraryCatalogSource } from '@/app/libraries/preset'
 import { IS_TAURI } from '@/constants'
 
 import App from './App.vue'
 import router from './router'
 
 preloadFonts()
+sanitizeLibraryCatalogSource()
 const head = createHead()
 createApp(App).use(router).use(head).use(createRetainedScopePlugin()).mount('#app')
 

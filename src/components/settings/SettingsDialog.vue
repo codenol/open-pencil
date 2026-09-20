@@ -19,7 +19,6 @@ import SettingsPage from '@/components/settings/layout/SettingsPage.vue'
 import MCPWorkspacePanel from '@/components/settings/mcp/MCPWorkspacePanel.vue'
 import MediaSettingsPanel from '@/components/settings/media/MediaSettingsPanel.vue'
 import ModelsPanel from '@/components/settings/models/ModelsPanel.vue'
-import StorageSettingsPanel from '@/components/settings/storage/StorageSettingsPanel.vue'
 import ToolAccessSettingsPanel from '@/components/settings/tool-access/ToolAccessSettingsPanel.vue'
 import UsageSettingsPanel from '@/components/settings/usage/UsageSettingsPanel.vue'
 import AppButton from '@/components/ui/button/AppButton.vue'
@@ -49,8 +48,7 @@ const sections = computed(
       { value: 'diagnostics', label: settings.value.diagnostics },
       { value: 'mcp', label: settings.value.mcp },
       { value: 'tools', label: settings.value.toolAccess },
-      { value: 'media', label: settings.value.media },
-      { value: 'storage', label: settings.value.storage }
+      { value: 'media', label: settings.value.media }
     ] satisfies { value: SettingsSection; label: string }[]
 )
 function onSectionChange(section: string | number): void {
@@ -127,10 +125,6 @@ function onOpenChange(open: boolean): void {
           <template #leading><icon-lucide-image class="size-3.5" /></template>
           {{ settings.media }}
         </AppTabsTrigger>
-        <AppTabsTrigger value="storage" data-test-id="settings-section-storage">
-          <template #leading><icon-lucide-cloud class="size-3.5" /></template>
-          {{ settings.storage }}
-        </AppTabsTrigger>
       </AppTabsList>
 
       <AppTabsContent value="general" as-child>
@@ -157,9 +151,6 @@ function onOpenChange(open: boolean): void {
       </AppTabsContent>
       <AppTabsContent value="media" as-child>
         <MediaSettingsPanel />
-      </AppTabsContent>
-      <AppTabsContent value="storage" as-child>
-        <StorageSettingsPanel />
       </AppTabsContent>
     </AppTabsRoot>
 

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { nextTick, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 import { useI18n, useViewportKind } from '@open-pencil/vue'
+import { useRouter } from 'vue-router'
 
 import { useEditorStore } from '@/app/editor/active-store'
 import { openLibraryReview, openPublishLibraryDialog, useLibraryService } from '@/app/libraries'
+import { librarySource } from '@/app/libraries/sources'
+import { refreshLibrarySources } from '@/app/libraries/sources-sync'
 import { useLibraryManager } from '@/components/libraries/useLibraryManager'
 import AppButton from '@/components/ui/button/AppButton.vue'
 import IconButton from '@/components/ui/button/IconButton.vue'
@@ -15,11 +18,11 @@ import {
   AppDialogRoot
 } from '@/components/ui/dialog'
 import AppPlaceholder from '@/components/ui/feedback/AppPlaceholder.vue'
-import SegmentedControl from '@/components/ui/select/SegmentedControl.vue'
 import AppTabsContent from '@/components/ui/tabs/AppTabsContent.vue'
 import AppTabsList from '@/components/ui/tabs/AppTabsList.vue'
 import AppTabsRoot from '@/components/ui/tabs/AppTabsRoot.vue'
 import AppTabsTrigger from '@/components/ui/tabs/AppTabsTrigger.vue'
+import AppCheckbox from '@/components/ui/toggle/AppCheckbox.vue'
 import AppSwitch from '@/components/ui/toggle/AppSwitch.vue'
 
 const { initialSection = 'browse' } = defineProps<{
@@ -42,17 +45,86 @@ const {
   showAllPages,
   applying,
   visibleUpdateGroups,
-  setSource,
+  refresh,
   toggleLibrary,
   preferLibrary,
   updateAsset,
-  updateAll
+  updateAll,
+  updateSelectedGroups
 } = useLibraryManager(open, editor, service)
 watch(open, (isOpen) => {
-  if (isOpen) section.value = initialSection
+  if (!isOpen) return
+  section.value = initialSection
+  // Подхватить метки «этот файл — источник библиотеки» у всех открытых документов.
+  refreshLibrarySources()
 })
-function selectSource(value: string) {
-  if (value === 'local' || value === 'storage') void setSource(value)
+const selectedUpdateKeys = ref<Set<string>>(new Set())
+const selectedUpdateGroups = computed(() =>
+  visibleUpdateGroups.value.filter((group) =>
+    selectedUpdateKeys.value.has(`${group.libraryId}:${group.assetKey}`)
+  )
+)
+const allUpdatesSelected = computed(
+  () =>
+    visibleUpdateGroups.value.length > 0 &&
+    selectedUpdateGroups.value.length === visibleUpdateGroups.value.length
+)
+function toggleUpdateSelection(group: (typeof visibleUpdateGroups.value)[number]): void {
+  const key = `${group.libraryId}:${group.assetKey}`
+  const next = new Set(selectedUpdateKeys.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  selectedUpdateKeys.value = next
+}
+function toggleAllUpdates(): void {
+  selectedUpdateKeys.value = allUpdatesSelected.value
+    ? new Set()
+    : new Set(visibleUpdateGroups.value.map((group) => `${group.libraryId}:${group.assetKey}`))
+}
+function updateSelected(): void {
+  const groups = [...selectedUpdateGroups.value]
+  selectedUpdateKeys.value = new Set()
+  void updateSelectedGroups(groups)
+}
+watch(visibleUpdateGroups, (groups) => {
+  const valid = new Set(groups.map((group) => `${group.libraryId}:${group.assetKey}`))
+  const next = new Set([...selectedUpdateKeys.value].filter((key) => valid.has(key)))
+  if (next.size !== selectedUpdateKeys.value.size) selectedUpdateKeys.value = next
+})
+
+const router = useRouter()
+
+function librarySourceKey(libraryId: string): string | null {
+  return librarySource(libraryId)?.fileKey ?? null
+}
+
+async function openLibrarySource(libraryId: string): Promise<void> {
+  const source = librarySource(libraryId)
+  if (!source) return
+  open.value = false
+  await nextTick()
+  await router.push(`/file/${encodeURIComponent(source.fileKey)}`)
+}
+
+const pendingRemoval = ref<string | null>(null)
+const removing = ref<string | null>(null)
+
+async function removeLibrary(libraryId: string): Promise<void> {
+  // Двухшаговое подтверждение: первый клик — «точно?», второй — удаляем.
+  if (pendingRemoval.value !== libraryId) {
+    pendingRemoval.value = libraryId
+    return
+  }
+  removing.value = libraryId
+  try {
+    await service.removeLibrary(libraryId)
+    pendingRemoval.value = null
+    await refresh()
+  } catch (cause) {
+    console.warn('[Libraries] не удалось удалить библиотеку', libraryId, cause)
+  } finally {
+    removing.value = null
+  }
 }
 
 function reviewUpdate(group: (typeof visibleUpdateGroups.value)[number]) {
@@ -98,17 +170,6 @@ function reviewUpdate(group: (typeof visibleUpdateGroups.value)[number]) {
       </AppTabsList>
       <AppTabsContent value="browse" as-child>
         <AppDialogBody>
-          <SegmentedControl
-            required
-            class="mb-4"
-            :model-value="service.catalogSource"
-            :label="panels.browseLibraries"
-            :options="[
-              { value: 'local', label: panels.localLibraries },
-              { value: 'storage', label: panels.storageLibraries }
-            ]"
-            @update:model-value="selectSource"
-          />
           <div
             v-for="library in service.summaries.value"
             :key="library.libraryId"
@@ -121,6 +182,13 @@ function reviewUpdate(group: (typeof visibleUpdateGroups.value)[number]) {
                 {{ panels.libraryAssetCount({ count: library.assetCount }) }}
               </p>
             </div>
+            <AppButton
+              v-if="librarySourceKey(library.libraryId)"
+              variant="outline"
+              @click="openLibrarySource(library.libraryId)"
+            >
+              {{ panels.openLibrarySource }}
+            </AppButton>
             <IconButton
               v-if="editor.graph.enabledLibraries.get(library.libraryId)?.enabled"
               :label="panels.preferLibrary"
@@ -135,6 +203,22 @@ function reviewUpdate(group: (typeof visibleUpdateGroups.value)[number]) {
                   : panels.enableLibrary
               }}
             </AppButton>
+            <AppButton
+              v-if="pendingRemoval === library.libraryId"
+              variant="outline"
+              :disabled="removing !== null"
+              @click="removeLibrary(library.libraryId)"
+            >
+              {{ panels.confirmRemoveLibrary }}
+            </AppButton>
+            <IconButton
+              v-else
+              :label="panels.removeLibrary"
+              :disabled="removing !== null"
+              @click="removeLibrary(library.libraryId)"
+            >
+              <icon-lucide-trash-2 class="size-4" />
+            </IconButton>
           </div>
           <AppPlaceholder
             v-if="!loading && service.summaries.value.length === 0"
@@ -145,12 +229,31 @@ function reviewUpdate(group: (typeof visibleUpdateGroups.value)[number]) {
       </AppTabsContent>
       <AppTabsContent value="updates" class="flex flex-col overflow-hidden">
         <AppDialogBody>
-          <h3 class="mb-3 text-sm font-semibold text-surface">{{ panels.libraryUpdates }}</h3>
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <h3 class="text-sm font-semibold text-surface">{{ panels.libraryUpdates }}</h3>
+            <label
+              v-if="visibleUpdateGroups.length > 1"
+              class="flex cursor-pointer items-center gap-2 text-[11px] text-muted"
+            >
+              <AppCheckbox
+                :model-value="allUpdatesSelected"
+                :ariaLabel="panels.selectAllUpdates"
+                @update:model-value="toggleAllUpdates"
+              />
+              {{ panels.selectAllUpdates }}
+            </label>
+          </div>
           <div
             v-for="asset in visibleUpdateGroups"
             :key="`${asset.libraryId}:${asset.assetKey}`"
             class="flex items-center gap-3 border-b border-border py-3"
           >
+            <AppCheckbox
+              :model-value="selectedUpdateKeys.has(`${asset.libraryId}:${asset.assetKey}`)"
+              :ariaLabel="asset.name"
+              :disabled="applying !== null"
+              @update:model-value="toggleUpdateSelection(asset)"
+            />
             <icon-lucide-component class="size-4 text-component" />
             <div class="min-w-0 flex-1">
               <button type="button" class="block w-full text-left" @click="reviewUpdate(asset)">
@@ -172,14 +275,23 @@ function reviewUpdate(group: (typeof visibleUpdateGroups.value)[number]) {
         </AppDialogBody>
         <AppDialogFooter :ui="{ footer: 'justify-between' }">
           <AppSwitch v-model="showAllPages" :label="panels.showUpdatesForAllPages" />
-          <AppButton
-            color="primary"
-            variant="solid"
-            :disabled="visibleUpdateGroups.length === 0 || applying !== null"
-            @click="updateAll"
-          >
-            {{ panels.updateAll }}
-          </AppButton>
+          <div class="flex items-center gap-2">
+            <AppButton
+              variant="outline"
+              :disabled="selectedUpdateGroups.length === 0 || applying !== null"
+              @click="updateSelected"
+            >
+              {{ panels.updateSelectedCount({ count: selectedUpdateGroups.length }) }}
+            </AppButton>
+            <AppButton
+              color="primary"
+              variant="solid"
+              :disabled="visibleUpdateGroups.length === 0 || applying !== null"
+              @click="updateAll"
+            >
+              {{ panels.updateAll }}
+            </AppButton>
+          </div>
         </AppDialogFooter>
       </AppTabsContent>
     </AppTabsRoot>

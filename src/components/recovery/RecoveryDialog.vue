@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { AlertDialogCancel, AlertDialogDescription, AlertDialogTitle } from 'reka-ui'
 import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useI18n } from '@open-pencil/vue'
 
@@ -16,6 +16,7 @@ import AppButton from '@/components/ui/button/AppButton.vue'
 const { recovery, common } = useI18n()
 const notifications = useNotificationMessages()
 const route = useRoute()
+const router = useRouter()
 const snapshots = ref<RecoverySnapshotMeta[]>([])
 const busyId = ref<string | null>(null)
 const open = ref(false)
@@ -56,7 +57,12 @@ async function discard(snapshot: RecoverySnapshotMeta): Promise<void> {
 }
 
 onMounted(async () => {
-  if (route.path !== '/' || !recoveryEnabled.value) return
+  if (!recoveryEnabled.value) return
+  // Дожидаемся разбора адреса: на прямом адресе файла (`/file/...`) восстановление
+  // выполняет url-sync, и диалог не должен перекрывать этот сценарий.
+  await router.isReady()
+  if (route.path.startsWith('/file/')) return
+  if (route.path !== '/' && route.path !== '/files') return
   try {
     snapshots.value = await listRecoverySnapshots()
     open.value = snapshots.value.length > 0

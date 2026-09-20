@@ -535,6 +535,43 @@ export function importNodeChanges(
   const guidToNodeId = new Map<string, string>()
   const getChildren = (ncId: string): string[] => childrenMap.get(ncId) ?? []
 
+  // Ленивая загрузка (populate: 'first-page'): ноды незагруженных страниц
+  // конвертируем «скелетом» — без заливок, геометрии и текста (как у Figma).
+  const skeletonEnabled = options.populate === 'first-page'
+  let activeCanvasIds: Set<string> | null = null
+  function canvasIdSet(): Set<string> {
+    if (activeCanvasIds) return activeCanvasIds
+    activeCanvasIds = new Set()
+    let docId: string | null = null
+    for (const [id, nc] of changeMap) {
+      if (nc.type === 'DOCUMENT') {
+        docId = id
+        break
+      }
+    }
+    let firstAssigned = false
+    for (const canvasId of childrenMap.get(docId ?? '') ?? []) {
+      const canvasNc = changeMap.get(canvasId)
+      if (!canvasNc || canvasNc.type !== 'CANVAS') continue
+      if (canvasNc.internalOnly) continue
+      else if (!firstAssigned) {
+        activeCanvasIds.add(canvasId)
+        firstAssigned = true
+      }
+    }
+    return activeCanvasIds
+  }
+  function canvasIdOf(ncId: string): string | null {
+    let current = ncId
+    for (let depth = 0; depth < 500; depth += 1) {
+      const parent = parentMap.get(current)
+      if (!parent) return null
+      if (changeMap.get(parent)?.type === 'DOCUMENT') return current
+      current = parent
+    }
+    return null
+  }
+
   function createSceneNode(ncId: string, graphParentId: string) {
     if (created.has(ncId)) return
     created.add(ncId)
@@ -542,7 +579,19 @@ export function importNodeChanges(
     const nc = changeMap.get(ncId)
     if (!nc) return
 
-    const { nodeType, ...props } = nodeChangeToProps(nc, blobs)
+    const lazySkeleton =
+      skeletonEnabled &&
+      nc.type !== 'CANVAS' &&
+      (() => {
+        const canvasId = canvasIdOf(ncId)
+        return canvasId !== null && !canvasIdSet().has(canvasId)
+      })()
+
+    const { nodeType, ...props } = nodeChangeToProps(
+      nc,
+      blobs,
+      lazySkeleton ? 'skeleton' : 'full'
+    )
     if (props.sharedStyleType) props.internalOnly = true
     if (nodeType === 'DOCUMENT' || nodeType === 'VARIABLE' || nc.type === 'VARIABLE_SET') return
     if (shouldImportTextAsAutoSize(nc, changeMap.get(parentMap.get(ncId) ?? ''))) {
@@ -568,12 +617,9 @@ export function importNodeChanges(
   applyVariantPropSpecs(graph)
 
   const firstPageId = graph.getPages().find((page) => !page.internalOnly)?.id
-  const componentPageIds =
-    options.populate === 'first-page' ? componentPageIdsForLazyPopulation(graph) : new Set<string>()
-  const activeRootIds =
-    options.populate === 'first-page'
-      ? [firstPageId, ...componentPageIds].filter(isNotNil)
-      : undefined
+  // Ленивая загрузка как у Figma: разворачиваем только открытую страницу,
+  // остальное (включая страницы компонентов) — скелетами, догрузка по требованию.
+  const activeRootIds = options.populate === 'first-page' ? [firstPageId].filter(isNotNil) : undefined
 
   if (options.populate !== 'none') {
     graph.preserveSourceMetadataDuring(() => {

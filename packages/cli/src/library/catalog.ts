@@ -11,7 +11,9 @@ import type {
 } from '@open-pencil/core/library'
 import {
   createLibraryRevision,
+  decodeLibraryValue,
   deserializeLibraryRevision,
+  encodeLibraryValue,
   serializeLibraryRevision
 } from '@open-pencil/core/library'
 
@@ -108,14 +110,15 @@ export class FileSystemLibraryCatalog implements LibraryCatalog {
   }
 
   async #readJSON<T>(relative: string): Promise<T> {
-    return JSON.parse(await readFile(this.#path(relative), 'utf8')) as T
+    const parsed = JSON.parse(await readFile(this.#path(relative), 'utf8')) as unknown
+    return decodeLibraryValue(parsed) as T
   }
 
   async #writeJSON(relative: string, value: unknown): Promise<void> {
     const path = this.#path(relative)
     const temporaryPath = `${path}.${crypto.randomUUID()}.tmp`
     await mkdir(dirname(path), { recursive: true })
-    await writeFile(temporaryPath, JSON.stringify(value, null, 2))
+    await writeFile(temporaryPath, JSON.stringify(encodeLibraryValue(value), null, 2))
     await rename(temporaryPath, path)
   }
 }

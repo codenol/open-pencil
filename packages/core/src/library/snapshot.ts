@@ -20,7 +20,7 @@ const VOLATILE_NODE_FIELDS = new Set([
 ])
 
 function assetKey(node: SceneNode): string {
-  const key = node.componentKey ?? node.sourceLibraryKey ?? node.publishId ?? node.source.id
+  const key = node.componentKey ?? node.sourceLibraryKey ?? node.publishId ?? node.source?.id ?? node.id
   if (!key) throw new Error(`Component ${node.name} has no stable library asset key`)
   assertLibraryAssetKey(key)
   return key
@@ -98,6 +98,19 @@ export function extractLibrarySnapshot(
       Boolean(node && (!node.parentId || !closure.has(node.parentId)))
     )
   for (const root of closureRoots) addSnapshotNode(source, snapshot, root.id, page.id, mappedIds)
+  // Некоторые компоненты из Figma не имеют componentKey/sourceLibraryKey/publishId и опираются
+  // только на source.id — а это volatile-поле, которое не переносится в снапшот. Фиксируем
+  // ключ из исходной ноды, иначе публикация библиотеки падает на таких компонентах.
+  for (const root of roots) {
+    const targetId = mappedIds.get(root.id)
+    if (!targetId) continue
+    const target = snapshot.getNode(targetId)
+    if (!target) continue
+    if (target.componentKey || target.sourceLibraryKey || target.publishId) continue
+    const fallbackKey =
+      root.componentKey ?? root.sourceLibraryKey ?? root.publishId ?? root.source?.id ?? root.id
+    snapshot.updateNode(targetId, { publishId: fallbackKey })
+  }
   for (const sourceId of mappedIds.keys()) {
     sourceComponentIds.set(sourceId, source.getNode(sourceId)?.componentId ?? null)
   }

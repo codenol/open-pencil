@@ -13,6 +13,10 @@ export function useActiveEditorStoreRef() {
 export function setActiveEditorStore(store: EditorStore) {
   storeRef.value = store
   triggerRef(storeRef)
+  // Предустановленные библиотеки (дизайн-система) подключаются к каждому открытому документу.
+  void import('@/app/libraries/preset')
+    .then(({ ensurePresetLibrariesEnabled }) => ensurePresetLibrariesEnabled(store))
+    .catch(() => {})
 }
 
 export function getActiveEditorStore(): EditorStore {

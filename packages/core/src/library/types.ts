@@ -57,6 +57,8 @@ export interface LibraryCatalog {
   listLibraries(): Promise<LibrarySummary[]>
   getRevision(libraryId: string, revisionId?: string): Promise<ComponentLibraryRevision>
   publishRevision(input: PublishLibraryInput): Promise<ComponentLibraryRevision>
+  /** Удаление библиотеки целиком (все ревизии). Не все каталоги поддерживают. */
+  removeLibrary?(libraryId: string): Promise<void>
 }
 
 export type LibraryAssetChange =

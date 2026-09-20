@@ -325,7 +325,8 @@ function buildCanvasEntries(
   docGuid: GUID,
   localIdCounter: { value: number },
   nodeIdToGuid: Map<string, GUID>,
-  assignedGuidValues: Set<string>
+  assignedGuidValues: Set<string>,
+  noImplicitInternalCanvas = false
 ): { canvasEntries: CanvasExportEntry[]; internalCanvasGuid: GUID | null } {
   const canvasEntries: CanvasExportEntry[] = []
   let internalCanvasGuid: GUID | null = null
@@ -367,7 +368,13 @@ function buildCanvasEntries(
   }
 
   const hasSharedStyles = [...graph.nodes.values()].some((node) => node.sharedStyleType !== null)
-  if ((graph.variableCollections.size > 0 || hasSharedStyles) && internalCanvasGuid === null) {
+  // Если в графе нет явной служебной страницы, но есть компоненты/токены — Figma-совместимо
+  // создаём её. Отключается флагом noImplicitInternalCanvas (нарезка «только компоненты»).
+  if (
+    !noImplicitInternalCanvas &&
+    (graph.variableCollections.size > 0 || hasSharedStyles) &&
+    internalCanvasGuid === null
+  ) {
     internalCanvasGuid = { sessionID: 0, localID: localIdCounter.value++ }
     assignedGuidValues.add(`${internalCanvasGuid.sessionID}:${internalCanvasGuid.localID}`)
     canvasEntries.push({
@@ -444,7 +451,8 @@ export async function exportFigFile(
   ck?: CanvasKit,
   renderer?: SkiaRenderer,
   pageId?: string,
-  renderHeadlessThumbnail = false
+  renderHeadlessThumbnail = false,
+  options: { noImplicitInternalCanvas?: boolean } = {}
 ): Promise<Uint8Array> {
   const originalArchive = await originalFigArchive(sourceGraph)
   if (originalArchive) return originalArchive.slice()
@@ -525,6 +533,8 @@ export async function exportFigFile(
     localIdCounter,
     nodeIdToGuid,
     assignedGuidValues
+  ,
+    options.noImplicitInternalCanvas ?? false
   )
 
   // Assign variable GUIDs AFTER canvas entries so that source.id-derived

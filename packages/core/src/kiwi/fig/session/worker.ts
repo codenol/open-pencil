@@ -83,7 +83,7 @@ self.onmessage = (event: MessageEvent<FigSessionOpenRequest>) => {
     parsedGraph.figKiwiVersion = figKiwiVersion
     parsedGraph.figSchemaDeflated = figSchemaDeflated
     graph = request.options?.populate === 'first-page' ? parsedGraph : undefined
-    respond({ type: 'graph', graph: serializeSceneGraph(parsedGraph) })
+    respond({ type: 'graph', graph: serializeSceneGraph(parsedGraph, { includeLazySource: false }) })
   } catch (error) {
     respond({ type: 'graph', error: error instanceof Error ? error.message : String(error) })
   }

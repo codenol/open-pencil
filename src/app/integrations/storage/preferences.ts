@@ -7,8 +7,13 @@ export type StoragePreferences = Record<StorageProviderID, Record<StorageFieldID
 
 export const activeStorageProviderID = useLocalStorage<StorageProviderID>(
   'open-pencil:storage:provider',
-  's3-compatible'
+  'norka-server'
 )
+
+// S3 больше не используется: если он был выбран ранее — переходим на серверное хранилище.
+if (activeStorageProviderID.value === 's3-compatible') {
+  activeStorageProviderID.value = 'norka-server'
+}
 
 const storedPreferences = useLocalStorage<StoragePreferences>('open-pencil:storage:preferences', {})
 

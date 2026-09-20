@@ -20,20 +20,28 @@ import { useEditorMenu } from '@/app/shell/menu/use'
 import { toast } from '@/app/shell/ui'
 import {
   activeTab,
-  createDocumentInCurrentTab,
   createHomeTab,
   createTab,
   getActiveStore,
   getTabsSnapshot,
+  switchTab,
   tabCount
 } from '@/app/tabs'
 import { isTauri } from '@/app/tauri/env'
+import { exportFigFile } from '@open-pencil/core/io/formats/fig'
+
+import { libraryManagerDialogOpen, libraryManagerInitialSection } from '@/app/libraries'
+import { persistStorageCanvasLocally } from '@/app/storage/sync/persist'
+import { kickSyncEngine } from '@/app/storage/sync/engine'
+import { useUrlSync } from '@/app/url/sync'
 import ColorSpaceBanner from '@/components/canvas/ColorSpaceBanner.vue'
 import CommandPalette from '@/components/commands/CommandPalette.vue'
 import EditorWorkspace from '@/components/editor/EditorWorkspace.vue'
 import FileApiBanner from '@/components/FileApiBanner.vue'
 import FontStatusBanner from '@/components/font-status/FontStatusBanner.vue'
 import HomeWorkspace from '@/components/home/HomeWorkspace.vue'
+import LibraryManagerDialog from '@/components/libraries/LibraryManagerDialog.vue'
+import MatchDialog from '@/components/matching/MatchDialog.vue'
 import RenameSelectionDialog from '@/components/selection/RenameSelectionDialog.vue'
 import TabBar from '@/components/TabBar.vue'
 import { IS_BROWSER } from '@/constants'
@@ -42,10 +50,10 @@ const route = useRoute()
 const router = useRouter()
 const createdInitialTab = tabCount() === 0
 const shouldCreateHome =
-  route.path === '/' &&
+  (route.path === '/' || route.path === '/files') &&
   !appRuntimeConfig.test &&
   !route.meta.demo &&
-  (isTauri() || appRuntimeConfig.recentFiles)
+  (isTauri() || appRuntimeConfig.recentFiles || IS_BROWSER)
 let firstTab = activeTab.value
 if (!firstTab) firstTab = shouldCreateHome ? createHomeTab() : createTab()
 
@@ -54,8 +62,37 @@ if (createdInitialTab && route.meta.demo && !appRuntimeConfig.test) {
 }
 
 useHead({ title: route.meta.demo ? 'Demo' : undefined })
+/** «New design»: файл сразу живёт на сервере — его видно в списке файлов и с другого устройства. */
+async function createDocumentOnServer(): Promise<void> {
+  const tab = createTab()
+  switchTab(tab.id)
+  try {
+    const documentId = crypto.randomUUID()
+    const name = 'Untitled'
+    const store = tab.store
+    const pageId = (store.state as { currentPageId?: string }).currentPageId
+    const figBytes = await exportFigFile(store.graph, undefined, undefined, pageId)
+    await persistStorageCanvasLocally({
+      providerId: 'norka-server',
+      canvasId: documentId,
+      name,
+      figBytes
+    })
+    store.setStorageDocumentSource({ providerId: 'norka-server', documentId }, name)
+    void kickSyncEngine()
+  } catch (error) {
+    console.error('[New document] не удалось создать файл на сервере', error)
+    toast.error(
+      notificationMessages.get().operationFailed({
+        error: error instanceof Error ? error.message : String(error)
+      })
+    )
+  }
+}
+
 useKeyboard()
 useEditorMenu()
+useUrlSync(router)
 
 const collab = useCollab(getActiveStore)
 provide(COLLAB_KEY, collab)
@@ -179,9 +216,11 @@ onUnmounted(() => {
     <ColorSpaceBanner />
     <FontStatusBanner />
     <RenameSelectionDialog />
+    <LibraryManagerDialog v-model="libraryManagerDialogOpen" :initial-section="libraryManagerInitialSection" />
+    <MatchDialog />
     <CommandPalette />
     <TabBar />
-    <HomeWorkspace v-show="activeTab?.kind === 'home'" @new-document="createDocumentInCurrentTab" />
+    <HomeWorkspace v-show="activeTab?.kind === 'home'" @new-document="createDocumentOnServer" />
     <EditorWorkspace v-if="activeTab?.kind !== 'home'" />
   </div>
 </template>

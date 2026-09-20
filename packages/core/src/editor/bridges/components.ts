@@ -27,6 +27,12 @@ export function createComponentBridge(
       ),
     createInstanceFromComponent: components.createInstanceFromComponent,
     detachInstance: () => components.detachInstance(selection.getSelectedNode()),
+    /** Перепривязка выделенных инстансов к другому главному компоненту. */
+    swapComponent: (componentId: string, instanceIds?: string[]) =>
+      components.swapInstances(
+        instanceIds ?? selection.getSelectedNodes().map((node) => node.id),
+        componentId
+      ),
     focusComponent: (componentId: string) =>
       components.focusComponent(componentId, pages.switchPage),
     goToMainComponent: () =>

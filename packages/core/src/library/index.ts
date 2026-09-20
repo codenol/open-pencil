@@ -1,4 +1,5 @@
 export * from './asset-keys'
+export * from './codec'
 export * from './definitions'
 export * from './diff'
 export * from './hash'

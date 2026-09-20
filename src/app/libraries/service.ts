@@ -11,6 +11,7 @@ import {
   summarizeLibraryUpdate,
   createSelectiveLibraryRevision,
   discoverPublishableLibraryChanges,
+  libraryExternalDependencies,
   readSourceLibraryPublication,
   writeSourceLibraryPublication
 } from '@open-pencil/core/library'
@@ -20,6 +21,7 @@ import type {
   LibrarySummary,
   LibraryUpdateImpact,
   LibraryUpdateSummary,
+  MaterializeLibraryOptions,
   PublishLibraryInput,
   LibraryAssetChange
 } from '@open-pencil/core/library'
@@ -30,13 +32,15 @@ import type {
 } from '@open-pencil/core/tools'
 
 import type { EditorStore } from '@/app/editor/session'
-import { LocalLibraryCatalog } from '@/app/libraries/catalog/local'
+import { BundledLibraryCatalog } from '@/app/libraries/catalog/bundled'
 import { RoutedLibraryCatalog, type LibraryCatalogSource } from '@/app/libraries/catalog/routed'
 import {
   readLibraryPriority,
   writeLibraryCatalogSource,
   writeLibraryPriority
 } from '@/app/libraries/preferences'
+import { createActiveStorageAdapter } from '@/app/integrations/storage'
+import { StorageLibraryCatalog } from '@/app/libraries/catalog/storage'
 import type { LibraryAssetUpdateGroup } from '@/app/libraries/update-groups'
 
 export type EnabledLibraryAsset = ComponentCatalogLibraryAsset
@@ -56,9 +60,21 @@ export class LibraryService implements ComponentCatalog {
       this.#catalog = markRaw(catalog)
       this.#routedCatalog = catalog instanceof RoutedLibraryCatalog ? catalog : null
     } else {
-      const routed = new RoutedLibraryCatalog(new LocalLibraryCatalog())
+      const routed = new RoutedLibraryCatalog(new BundledLibraryCatalog())
       this.#catalog = markRaw(routed)
       this.#routedCatalog = routed
+      this.#connectServerCatalog()
+    }
+  }
+
+  /** Каталог библиотек живёт на нашем сервере (общий для команды), локальный — кэш. */
+  #connectServerCatalog(): void {
+    try {
+      const objects = createActiveStorageAdapter('norka-server').libraryObjects
+      if (!objects) return
+      this.useStorageCatalog(new StorageLibraryCatalog(objects))
+    } catch {
+      // сервер недоступен — работаем на локальном кэше
     }
   }
 
@@ -95,6 +111,14 @@ export class LibraryService implements ComponentCatalog {
   async listLibraries(): Promise<LibrarySummary[]> {
     this.#summaries.value = await this.#catalog.listLibraries()
     return this.#summaries.value
+  }
+
+  /** Удалить библиотеку из каталога (все ревизии). Материализованные компоненты в файлах остаются. */
+  async removeLibrary(libraryId: string): Promise<void> {
+    if (!this.#catalog.removeLibrary) throw new Error('Каталог не поддерживает удаление библиотек')
+    await this.#catalog.removeLibrary(libraryId)
+    this.#revisionCache.clear()
+    this.#summaries.value = await this.#catalog.listLibraries()
   }
 
   async listComponents(input: {
@@ -220,9 +244,9 @@ export class LibraryService implements ComponentCatalog {
 
     let appliedPlans: ReturnType<typeof planLibraryInstanceUpdates> = []
     let createdRootIds: string[] = []
-    const applyRevision = () => {
+    const applyRevision = async () => {
       const existingNodeIds = new Set(editor.graph.nodes.keys())
-      for (const asset of updatable) materializeLibraryAsset(editor.graph, latest, asset.key)
+      for (const asset of updatable) await materializeLibraryAsset(editor.graph, latest, asset.key, this.#materializeOptions())
       createdRootIds = [...editor.graph.getAllNodes()]
         .filter((node) => {
           if (existingNodeIds.has(node.id)) return false
@@ -261,7 +285,7 @@ export class LibraryService implements ComponentCatalog {
       editor.requestRender()
     }
 
-    applyRevision()
+    await applyRevision()
     editor.pushUndoEntry({
       label: 'Update library',
       forward: applyRevision,
@@ -281,7 +305,7 @@ export class LibraryService implements ComponentCatalog {
     const summary = this.#summaries.value.find((item) => item.libraryId === identity.libraryId)
     if (!summary || summary.latestRevisionId === identity.revisionId) return
     const latest = await this.#getRevision(identity.libraryId, summary.latestRevisionId)
-    materializeLibraryAsset(editor.graph, latest, identity.assetKey)
+    await materializeLibraryAsset(editor.graph, latest, identity.assetKey, this.#materializeOptions())
     const plans = planOutdatedLibraryInstances(
       editor.graph,
       latest,
@@ -349,7 +373,7 @@ export class LibraryService implements ComponentCatalog {
     const plans: ReturnType<typeof planOutdatedLibraryInstances> = []
     for (const group of groups) {
       const latest = await this.#getRevision(group.libraryId)
-      materializeLibraryAsset(editor.graph, latest, group.assetKey)
+      await materializeLibraryAsset(editor.graph, latest, group.assetKey, this.#materializeOptions())
       plans.push(
         ...planOutdatedLibraryInstances(
           editor.graph,
@@ -389,7 +413,7 @@ export class LibraryService implements ComponentCatalog {
     label = 'Update library instances'
   ): Promise<void> {
     const latest = await this.#getRevision(libraryId)
-    materializeLibraryAsset(editor.graph, latest, assetKey)
+    await materializeLibraryAsset(editor.graph, latest, assetKey, this.#materializeOptions())
     const plans = planOutdatedLibraryInstances(
       editor.graph,
       latest,
@@ -405,7 +429,7 @@ export class LibraryService implements ComponentCatalog {
     const summary = this.#summaries.value.find((item) => item.libraryId === libraryId)
     if (!summary) return
     const latest = await this.#getRevision(libraryId, summary.latestRevisionId)
-    materializeLibraryAsset(editor.graph, latest, assetKey)
+    await materializeLibraryAsset(editor.graph, latest, assetKey, this.#materializeOptions())
     const plans = planOutdatedLibraryInstances(editor.graph, latest, new Set([assetKey]))
     if (plans.length === 0) return
     this.#applyPlans(editor, plans, 'Update library asset')
@@ -516,13 +540,31 @@ export class LibraryService implements ComponentCatalog {
   }
 
   async enable(editor: EditorStore, libraryId: string, revisionId?: string): Promise<void> {
+    // Рекурсивно: библиотека может ссылаться на другие — включаем всю цепочку,
+    // чтобы её компоненты не остались без зависимостей. Защита от зацикливания — visited.
+    await this.#enableWithDependencies(editor, libraryId, revisionId, new Set())
+    await this.refresh(editor)
+  }
+
+  async #enableWithDependencies(
+    editor: EditorStore,
+    libraryId: string,
+    revisionId: string | undefined,
+    visited: Set<string>
+  ): Promise<void> {
+    if (visited.has(libraryId)) return
+    visited.add(libraryId)
     const revision = await this.#getRevision(libraryId, revisionId)
+    for (const dependencyId of libraryExternalDependencies(revision).keys()) {
+      if (!editor.graph.enabledLibraries.get(dependencyId)?.enabled) {
+        await this.#enableWithDependencies(editor, dependencyId, undefined, visited)
+      }
+    }
     editor.graph.enabledLibraries.set(libraryId, {
       libraryId,
       revisionId: revision.manifest.revisionId,
       enabled: true
     })
-    await this.refresh(editor)
   }
 
   async disable(editor: EditorStore, libraryId: string): Promise<void> {
@@ -531,9 +573,33 @@ export class LibraryService implements ComponentCatalog {
     await this.refresh(editor)
   }
 
+  /** Каталог для линковки: вшитые копии из связанных библиотек заменяются нативными. */
+  #materializeOptions(): MaterializeLibraryOptions {
+    return {
+      resolveRevision: (libraryId, revisionId) =>
+        this.#getRevision(libraryId, revisionId).catch(() => null)
+    }
+  }
+
   async materialize(editor: EditorStore, libraryId: string, revisionId: string, assetKey: string) {
     const revision = await this.#getRevision(libraryId, revisionId)
-    const result = materializeLibraryAsset(editor.graph, revision, assetKey)
+    const result = await materializeLibraryAsset(
+      editor.graph,
+      revision,
+      assetKey,
+      this.#materializeOptions()
+    )
+    // Библиотеки, на которые ссылается ассет, включаем — иначе его линки останутся без источника.
+    for (const dependencyId of libraryExternalDependencies(revision).keys()) {
+      if (editor.graph.enabledLibraries.get(dependencyId)?.enabled) continue
+      const dependency = await this.#getRevision(dependencyId).catch(() => null)
+      if (!dependency) continue
+      editor.graph.enabledLibraries.set(dependencyId, {
+        libraryId: dependencyId,
+        revisionId: dependency.manifest.revisionId,
+        enabled: true
+      })
+    }
     editor.requestRender()
     return result
   }

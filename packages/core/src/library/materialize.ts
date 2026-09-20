@@ -51,6 +51,33 @@ export function libraryDependencyRoots(
   return [...roots.values()]
 }
 
+/**
+ * Внешние зависимости ревизии: на какие другие библиотеки ссылаются её компоненты.
+ * Ключ — libraryId чужой библиотеки, значение — использованные assetKey.
+ */
+export function libraryExternalDependencies(
+  revision: ComponentLibraryRevision
+): Map<string, Set<string>> {
+  const ownLibraryId = revision.manifest.libraryId
+  const dependencies = new Map<string, Set<string>>()
+  const visited = new Set<string>()
+  const pending = revision.graph.getPages(true).flatMap((page) => [...page.childIds])
+  while (pending.length > 0) {
+    const id = pending.pop()
+    if (!id || visited.has(id)) continue
+    visited.add(id)
+    const node = revision.graph.getNode(id)
+    if (!node) continue
+    pending.push(...node.childIds)
+    const identity = node.librarySource?.identity
+    if (!identity || identity.libraryId === ownLibraryId) continue
+    const assets = dependencies.get(identity.libraryId) ?? new Set<string>()
+    assets.add(identity.assetKey)
+    dependencies.set(identity.libraryId, assets)
+  }
+  return dependencies
+}
+
 export function copyLibraryTree(
   source: SceneGraph,
   target: SceneGraph,
@@ -132,11 +159,59 @@ function defaultComponent(graph: SceneGraph, root: SceneNode): SceneNode | undef
     .sort((left, right) => left.y - right.y || left.x - right.x)[0]
 }
 
-export function materializeLibraryAsset(
+export interface MaterializeLibraryOptions {
+  /** Каталог: чтобы подтянуть компоненты из связанных библиотек (вместо вшитых копий). */
+  resolveRevision?: (libraryId: string, revisionId?: string) => Promise<ComponentLibraryRevision | null>
+}
+
+/** Все ноды графа (включая служебные страницы). */
+function allNodes(graph: SceneGraph): SceneNode[] {
+  const nodes: SceneNode[] = []
+  const visited = new Set<string>()
+  const pending = graph.getPages(true).flatMap((page) => [...page.childIds])
+  while (pending.length > 0) {
+    const id = pending.pop()
+    if (!id || visited.has(id)) continue
+    visited.add(id)
+    const node = graph.getNode(id)
+    if (!node) continue
+    nodes.push(node)
+    pending.push(...node.childIds)
+  }
+  return nodes
+}
+
+/** Инстансы, ссылающиеся на вшитое определение, переводим на нативное из его библиотеки. */
+function relinkInstances(graph: SceneGraph, staleComponentId: string, nativeComponentId: string): void {
+  for (const node of allNodes(graph)) {
+    if (node.componentId === staleComponentId) {
+      graph.updateNode(node.id, { componentId: nativeComponentId })
+    }
+  }
+}
+
+function collectExternalDefinitions(
+  revision: ComponentLibraryRevision,
+  mappedIds: Map<string, string>
+): Map<string, { libraryId: string; assetKey: string }> {
+  const ownLibraryId = revision.manifest.libraryId
+  const externals = new Map<string, { libraryId: string; assetKey: string }>()
+  for (const [sourceId, targetId] of mappedIds) {
+    const source = revision.graph.getNode(sourceId)
+    if (source?.type !== 'COMPONENT' && source?.type !== 'COMPONENT_SET') continue
+    const identity = source.librarySource?.identity
+    if (!identity || identity.libraryId === ownLibraryId) continue
+    externals.set(targetId, { libraryId: identity.libraryId, assetKey: identity.assetKey })
+  }
+  return externals
+}
+
+export async function materializeLibraryAsset(
   consumer: SceneGraph,
   revision: ComponentLibraryRevision,
-  assetKey: string
-): MaterializedLibraryAsset {
+  assetKey: string,
+  options: MaterializeLibraryOptions = {}
+): Promise<MaterializedLibraryAsset> {
   const { libraryId, revisionId } = revision.manifest
   assertLibraryId(libraryId)
   assertLibraryAssetKey(assetKey)
@@ -164,6 +239,8 @@ export function materializeLibraryAsset(
   markDefinitions(consumer, revision, mappedIds)
   copyImages(revision.graph, consumer, mappedIds)
 
+  await relinkExternalDependencies(consumer, revision, mappedIds, options)
+
   const rootId = mappedIds.get(descriptor.sourceNodeId)
   const root = rootId ? consumer.getNode(rootId) : undefined
   if (!root) throw new Error(`Failed to materialize library asset: ${assetKey}`)
@@ -174,5 +251,33 @@ export function materializeLibraryAsset(
     componentSetId: root.type === 'COMPONENT_SET' ? root.id : null,
     pageId: page.id,
     created: true
+  }
+}
+
+/**
+ * Библиотека A ссылается на компоненты библиотеки B: вместо вшитой копии подтягиваем
+ * нативное определение из B и переводим ссылки инстансов на него. Так обновления B
+ * доходят до потребителя A, а не остаются «запечёнными» в ревизии.
+ */
+async function relinkExternalDependencies(
+  consumer: SceneGraph,
+  revision: ComponentLibraryRevision,
+  mappedIds: Map<string, string>,
+  options: MaterializeLibraryOptions
+): Promise<void> {
+  const resolve = options.resolveRevision
+  if (!resolve) return
+  const externals = collectExternalDefinitions(revision, mappedIds)
+  for (const [staleDefinitionId, external] of externals) {
+    try {
+      const externalRevision = await resolve(external.libraryId)
+      if (!externalRevision) continue
+      const materialized = await materializeLibraryAsset(consumer, externalRevision, external.assetKey, options)
+      if (materialized.componentId !== staleDefinitionId) {
+        relinkInstances(consumer, staleDefinitionId, materialized.componentId)
+      }
+    } catch (error) {
+      console.warn('[Library] не удалось подтянуть зависимость', external, error)
+    }
   }
 }

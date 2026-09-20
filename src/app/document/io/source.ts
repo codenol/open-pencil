@@ -30,6 +30,15 @@ type DocumentSourceOptions = DocumentSourceAccess & {
   getRenderer: () => Editor['renderer']
 }
 
+/**
+ * Веб-ссылка (`https://…`) — источник только для чтения: по нему нельзя записать файл,
+ * поэтому такой документ продолжает жить как черновик (с recovery-снапшотом), а
+ * «Сохранить» предлагает скачивание.
+ */
+function isRemoteSourcePath(path: string | null): boolean {
+  return !!path && /^https?:\/\//i.test(path)
+}
+
 export function createDocumentSourceActions({
   editor,
   state,
@@ -71,7 +80,10 @@ export function createDocumentSourceActions({
     state,
     isEnabled: () => recoveryEnabled.value,
     buildFigFile: buildRecoveryFigFile,
-    hasWritableSource: () => !!getFileHandle() || !!getFilePath() || !!getStorageBinding()
+    hasWritableSource: () =>
+      !!getFileHandle() ||
+      (!!getFilePath() && !isRemoteSourcePath(getFilePath())) ||
+      !!getStorageBinding()
   })
 
   const { saveFigFile, saveFigFileAs, writeFile } = createSaveActions({
@@ -98,7 +110,10 @@ export function createDocumentSourceActions({
   const autosave = createAutosave({
     state,
     getSavedVersion,
-    hasWritableSource: () => !!getFileHandle() || !!getFilePath() || !!getStorageBinding(),
+    hasWritableSource: () =>
+      !!getFileHandle() ||
+      (!!getFilePath() && !isRemoteSourcePath(getFilePath())) ||
+      !!getStorageBinding(),
     saveCurrentDocument: async (version) => {
       const revision = changes.capture()
       const data = await buildFigFile()
@@ -121,7 +136,15 @@ export function createDocumentSourceActions({
     setSourceIdentity({ handle: handle ?? null, path: path ?? null })
     setSavedVersion(state.sceneVersion)
     changes.markSaved()
-    void recovery.markProtectedVersion(state.sceneVersion)
+    if (isFig && path && isRemoteSourcePath(path)) {
+      // Источник только для чтения (веб-ссылка): сразу снимаем восстановительную копию,
+      // чтобы адрес документа пережил перезагрузку страницы.
+      void recovery.persistNow().catch((error) => {
+        console.warn('[Recovery] Snapshot for the link-opened document failed:', error)
+      })
+    } else {
+      void recovery.markProtectedVersion(state.sceneVersion)
+    }
     if (isFig && (handle || path)) {
       void startWatchingFile()
     }
