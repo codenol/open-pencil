@@ -579,9 +579,20 @@ export function importNodeChanges(
     const nc = changeMap.get(ncId)
     if (!nc) return
 
+    // Компоненты и их содержимое всегда грузим целиком: скелетный режим
+    // вырезает заливки, обводки и текст, а развернуть их потом нечем —
+    // компоненты остаются пустыми. Скелеты оставляем только для не-компонентных
+    // нод на неоткрытых страницах (витрины, крупные макеты).
+    const isComponentNode =
+      nc.type === 'SYMBOL' ||
+      nc.type === 'COMPONENT_SET' ||
+      nc.symbolData !== undefined ||
+      nc.componentPropDefs !== undefined
     const lazySkeleton =
       skeletonEnabled &&
+      !isComponentNode &&
       nc.type !== 'CANVAS' &&
+      nc.type !== 'SYMBOL' &&
       (() => {
         const canvasId = canvasIdOf(ncId)
         return canvasId !== null && !canvasIdSet().has(canvasId)
