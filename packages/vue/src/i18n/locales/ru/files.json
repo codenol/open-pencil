@@ -42,5 +42,6 @@
   "defaultLibrary": "По умолчанию",
   "setDefaultLibrary": "Подключать в новых файлах",
   "columnName": "Название",
-  "columnUpdated": "Изменён"
+  "columnUpdated": "Изменён",
+  "unpublishLibrary": "Снять с публикации"
 }

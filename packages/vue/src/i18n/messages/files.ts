@@ -41,6 +41,7 @@ export const filesMessageDefaults = {
   libraryStatus: 'Status',
   defaultLibrary: 'Default',
   setDefaultLibrary: 'Use as default for new files',
+  unpublishLibrary: 'Unpublish',
   noLibrariesHint: 'Open a file with components and create a library from it — then you can connect it in any other file.',
   libraryAssetCount: params('Components: {count}'),
   recentFiles: 'Recent files',

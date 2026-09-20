@@ -183,6 +183,19 @@ export class StorageLibraryCatalog implements LibraryCatalog {
     return revision
   }
 
+  /**
+   * Снятие библиотеки с публикации: убираем её объекты с сервера.
+   * Локальная копия остаётся — библиотеку можно опубликовать снова.
+   */
+  async removeLibrary(libraryId: string): Promise<void> {
+    if (!this.#objects.removeObject) {
+      throw new Error('Хранилище не поддерживает снятие библиотеки с публикации')
+    }
+    const objects = await this.#objects.listObjects(`${PREFIX}/${libraryId}/`)
+    for (const object of objects) await this.#objects.removeObject(object.key)
+    await this.#objects.removeObject(latestKey(libraryId))
+  }
+
   async publishRevision(input: PublishLibraryInput): Promise<ComponentLibraryRevision> {
     const manifestKey = latestKey(input.libraryId)
     const latestValue = this.#objects.getObjectValue
