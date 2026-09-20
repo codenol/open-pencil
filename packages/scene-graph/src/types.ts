@@ -557,6 +557,15 @@ export interface SceneNode {
   isPublishable: boolean
   isSymbolPublishable: boolean
   symbolDescription: string
+  /**
+   * Правила «как можно» пользоваться компонентом (когда применять, с чем сочетать).
+   * Живут и в файле, и в библиотеке; читаются человеком и LLM.
+   */
+  symbolGuidelines: string
+  /**
+   * Правила «как нельзя»: чего избегать, типовые ошибки при использовании компонента.
+   */
+  symbolGuardrails: string
   symbolLinks: SymbolLink[]
   variantPropSpecs: VariantPropSpec[]
 
