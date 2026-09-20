@@ -82,6 +82,16 @@ export function createViewportActions(ctx: EditorContext) {
     zoomToBounds(b.x, b.y, b.x + b.width, b.y + b.height)
   }
 
+  /** Вписывает содержимое конкретной страницы (используется при переключении). */
+  function zoomToPage(pageId: string) {
+    const nodes = ctx.graph.getChildren(pageId)
+    if (nodes.length === 0) return false
+    const b = computeBounds(nodes)
+    if (!Number.isFinite(b.x) || b.width <= 0 || b.height <= 0) return false
+    zoomToBounds(b.x, b.y, b.x + b.width, b.y + b.height)
+    return true
+  }
+
   function zoomToLevel(level: number) {
     const { width: viewW, height: viewH } = ctx.getViewportSize()
     const centerX = (-ctx.state.panX + viewW / 2) / ctx.state.zoom
@@ -118,6 +128,7 @@ export function createViewportActions(ctx: EditorContext) {
     pan,
     zoomToBounds,
     zoomToFit,
+    zoomToPage,
     zoomTo100,
     zoomToLevel,
     zoomToSelection

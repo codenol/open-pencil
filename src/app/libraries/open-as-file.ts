@@ -20,7 +20,10 @@ export async function openLibraryAsFile(libraryId: string): Promise<void> {
   const summary = service.summaries.value.find((item) => item.libraryId === libraryId)
   const revision = await service.getRevision(libraryId, summary?.latestRevisionId)
 
-  // Ревизия библиотеки — готовый граф с компонентами: показываем его как документ.
+  // Страницы библиотеки хранятся служебными — редактор такие прячет и падает
+  // без публичной страницы. Для просмотра делаем их обычными.
+  for (const page of revision.graph.getPages(true)) page.internalOnly = false
+
   const store = createEditorStore(revision.graph)
   store.state.documentName = revision.manifest.name
 

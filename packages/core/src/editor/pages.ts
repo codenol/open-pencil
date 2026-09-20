@@ -39,8 +39,11 @@ function throwIfAborted(signal?: AbortSignal): void {
 }
 
 const MAX_CONCURRENT_FONT_LOADS = 4
-export function createPageActions(ctx: EditorContext) {
-  const pageViewportStore = createPageViewportStore(ctx)
+export function createPageActions(
+  ctx: EditorContext,
+  deps: { zoomToPage?: (pageId: string) => boolean } = {}
+) {
+  const pageViewportStore = createPageViewportStore(ctx, deps)
   let populationWorkerInstance: ReturnType<typeof createFigPopulationWorker> | undefined
   let populationWorkerGeneration = 0
   let pageSwitchGeneration = 0
