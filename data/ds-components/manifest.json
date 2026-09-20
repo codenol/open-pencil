@@ -1,0 +1,24 @@
+{
+ "source": "/opt/open-pencil/data/ds-unpacked/canvas.fig",
+ "maxNodes": 2400,
+ "files": [
+  {
+   "file": "components-1.fig",
+   "components": 1,
+   "nodes": 2401,
+   "bytes": 113493,
+   "preview": "🚫button",
+   "variables": 314,
+   "collections": 2
+  },
+  {
+   "file": "components-2.fig",
+   "components": 50,
+   "nodes": 1151,
+   "bytes": 290037,
+   "preview": "Table Cell_Progress_Checkbox",
+   "variables": 2195,
+   "collections": 4
+  }
+ ]
+}

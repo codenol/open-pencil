@@ -1,0 +1,358 @@
+{
+ "source": "/opt/open-pencil/data/ds-unpacked/canvas.fig",
+ "pages": [
+  {
+   "page": "Cover",
+   "file": "Cover.fig",
+   "nodes": 213,
+   "bytes": 47424
+  },
+  {
+   "page": "Internal Only Canvas",
+   "internal": true,
+   "skipped": true
+  },
+  {
+   "page": "Color",
+   "file": "Color.fig",
+   "nodes": 2159,
+   "bytes": 94681
+  },
+  {
+   "page": "Guidelines",
+   "file": "Guidelines.fig",
+   "nodes": 376,
+   "bytes": 432530
+  },
+  {
+   "page": "Data table",
+   "file": "Data-table.fig",
+   "nodes": 7,
+   "bytes": 36752
+  },
+  {
+   "page": "Typography",
+   "file": "Typography.fig",
+   "nodes": 70,
+   "bytes": 54544
+  },
+  {
+   "page": "Components",
+   "file": "Components.fig",
+   "nodes": 17,
+   "bytes": 45518
+  },
+  {
+   "page": "Dimensions",
+   "file": "Dimensions.fig",
+   "nodes": 147,
+   "bytes": 43995
+  },
+  {
+   "page": "Gaps",
+   "file": "Gaps.fig",
+   "nodes": 13,
+   "bytes": 41262
+  },
+  {
+   "page": "Internal",
+   "file": "Internal.fig",
+   "nodes": 162,
+   "bytes": 77055
+  },
+  {
+   "page": "Tests component",
+   "file": "Tests-component.fig",
+   "nodes": 4514,
+   "bytes": 657072
+  },
+  {
+   "page": "",
+   "file": "0:64266.fig",
+   "nodes": 4,
+   "bytes": 33054
+  },
+  {
+   "page": "✅ Accordion status",
+   "file": "-Accordion-status.fig",
+   "nodes": 381,
+   "bytes": 114378
+  },
+  {
+   "page": "✅ ☑️ Buttons (без описания)",
+   "file": "-Buttons-без-описания.fig",
+   "nodes": 4403,
+   "bytes": 261568
+  },
+  {
+   "page": "✅ Badges (без описания)",
+   "file": "-Badges-без-описания.fig",
+   "nodes": 1263,
+   "bytes": 134539
+  },
+  {
+   "page": "✅ Card",
+   "file": "-Card.fig",
+   "nodes": 26,
+   "bytes": 59375
+  },
+  {
+   "page": "✅ ☑️ Chip (без описания)",
+   "file": "-Chip-без-описания.fig",
+   "nodes": 40,
+   "bytes": 48650
+  },
+  {
+   "page": "✅ ☑️ Checkbox (без описания)",
+   "file": "-Checkbox-без-описания.fig",
+   "nodes": 1745,
+   "bytes": 240947
+  },
+  {
+   "page": "✅ ☑️ Drawer (без описания)",
+   "file": "-Drawer-без-описания.fig",
+   "nodes": 56,
+   "bytes": 68188
+  },
+  {
+   "page": "Dialog",
+   "file": "Dialog.fig",
+   "nodes": 44,
+   "bytes": 58001
+  },
+  {
+   "page": "✅ ☑️ Dropdown, DropdownMenuItem (без описания)",
+   "file": "-Dropdown-DropdownMenuItem-без-описания.fig",
+   "nodes": 1513,
+   "bytes": 223988
+  },
+  {
+   "page": "✅ Divider",
+   "file": "-Divider.fig",
+   "nodes": 16,
+   "bytes": 40940
+  },
+  {
+   "page": "✅ Indicator",
+   "file": "-Indicator.fig",
+   "nodes": 55,
+   "bytes": 37114
+  },
+  {
+   "page": "✅ ☑️ Input (без описания)",
+   "file": "-Input-без-описания.fig",
+   "nodes": 856,
+   "bytes": 118742
+  },
+  {
+   "page": "✅ Input Datepicker, Calendar",
+   "file": "-Input-Datepicker-Calendar.fig",
+   "nodes": 519,
+   "bytes": 151664
+  },
+  {
+   "page": "✅ ☑️ Input Number",
+   "file": "-Input-Number.fig",
+   "nodes": 93,
+   "bytes": 63430
+  },
+  {
+   "page": "✅ ☑️ Input Password (без описания)",
+   "file": "-Input-Password-без-описания.fig",
+   "nodes": 253,
+   "bytes": 81742
+  },
+  {
+   "page": "✅ Input Search",
+   "file": "-Input-Search.fig",
+   "nodes": 72,
+   "bytes": 71065
+  },
+  {
+   "page": "✅ ☑️ Layout, Sidebar, breadcrumbs",
+   "file": "-Layout-Sidebar-breadcrumbs.fig",
+   "nodes": 3575,
+   "bytes": 541140
+  },
+  {
+   "page": "(☉_☉) Layout new slot",
+   "file": "_-Layout-new-slot.fig",
+   "nodes": 236,
+   "bytes": 91055
+  },
+  {
+   "page": "✅ Modal (без описания)",
+   "file": "-Modal-без-описания.fig",
+   "nodes": 2845,
+   "bytes": 344759
+  },
+  {
+   "page": "✅ ☑️ Message (без описания)",
+   "file": "-Message-без-описания.fig",
+   "nodes": 385,
+   "bytes": 116949
+  },
+  {
+   "page": "✅ ☑️ Option-switcher",
+   "file": "-Option-switcher.fig",
+   "nodes": 520,
+   "bytes": 82796
+  },
+  {
+   "page": "✅ ☑️ Pagination",
+   "file": "-Pagination.fig",
+   "nodes": 89,
+   "bytes": 54325
+  },
+  {
+   "page": "✅ Progress",
+   "file": "-Progress.fig",
+   "nodes": 30,
+   "bytes": 45865
+  },
+  {
+   "page": "✅ ☑️ RadioButton (без описания)",
+   "file": "-RadioButton-без-описания.fig",
+   "nodes": 112,
+   "bytes": 54936
+  },
+  {
+   "page": "✅ ☑️ Scrollbar",
+   "file": "-Scrollbar.fig",
+   "nodes": 669,
+   "bytes": 110449
+  },
+  {
+   "page": "✅ ☑️ Status (без описания)",
+   "file": "-Status-без-описания.fig",
+   "nodes": 1079,
+   "bytes": 117543
+  },
+  {
+   "page": "✅ ☑️ Switch (без описания)",
+   "file": "-Switch-без-описания.fig",
+   "nodes": 491,
+   "bytes": 95670
+  },
+  {
+   "page": "✅ Tabs",
+   "file": "-Tabs.fig",
+   "nodes": 75,
+   "bytes": 50568
+  },
+  {
+   "page": "✅ Textarea (без описания)",
+   "file": "-Textarea-без-описания.fig",
+   "nodes": 531,
+   "bytes": 113475
+  },
+  {
+   "page": "✅ ☑️ Toast (без описания)",
+   "file": "-Toast-без-описания.fig",
+   "nodes": 199,
+   "bytes": 65834
+  },
+  {
+   "page": "✅  Tool tip (без описания)",
+   "file": "-Tool-tip-без-описания.fig",
+   "nodes": 475,
+   "bytes": 145249
+  },
+  {
+   "page": "✅ Toggle button (без описания)",
+   "file": "-Toggle-button-без-описания.fig",
+   "nodes": 528,
+   "bytes": 94220
+  },
+  {
+   "page": "✅ Toggletip (без описания)",
+   "file": "-Toggletip-без-описания.fig",
+   "nodes": 94,
+   "bytes": 53993
+  },
+  {
+   "page": "✅ Zoom Controls (без описания)",
+   "file": "-Zoom-Controls-без-описания.fig",
+   "nodes": 96,
+   "bytes": 56184
+  },
+  {
+   "page": "✅ Uploading files",
+   "file": "-Uploading-files.fig",
+   "nodes": 115,
+   "bytes": 92339
+  },
+  {
+   "page": "Stepper",
+   "file": "Stepper.fig",
+   "nodes": 989,
+   "bytes": 87354
+  },
+  {
+   "page": "Drag and drop",
+   "file": "Drag-and-drop.fig",
+   "nodes": 275,
+   "bytes": 83453
+  },
+  {
+   "page": "list",
+   "file": "list.fig",
+   "nodes": 37,
+   "bytes": 42791
+  },
+  {
+   "page": "Toolbar",
+   "file": "Toolbar.fig",
+   "nodes": 157,
+   "bytes": 65513
+  },
+  {
+   "page": "Heat map (без описания)",
+   "file": "Heat-map-без-описания.fig",
+   "nodes": 38,
+   "bytes": 36214
+  },
+  {
+   "page": "Table",
+   "file": "Table.fig",
+   "nodes": 1565,
+   "bytes": 164284
+  },
+  {
+   "page": "---------------",
+   "file": "---------------.fig",
+   "nodes": 4,
+   "bytes": 33056
+  },
+  {
+   "page": "draft",
+   "file": "draft.fig",
+   "nodes": 13568,
+   "bytes": 806295
+  },
+  {
+   "page": "аналитика по кнопкам",
+   "file": "аналитика-по-кнопкам.fig",
+   "nodes": 37,
+   "bytes": 49297
+  },
+  {
+   "page": "Research",
+   "file": "Research.fig",
+   "nodes": 19,
+   "bytes": 36471
+  },
+  {
+   "page": "Page 40",
+   "file": "Page-40.fig",
+   "nodes": 4,
+   "bytes": 33061
+  },
+  {
+   "page": "Plugin",
+   "file": "Plugin.fig",
+   "nodes": 55,
+   "bytes": 40495
+  }
+ ]
+}

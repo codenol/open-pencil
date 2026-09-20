@@ -1,0 +1,249 @@
+[
+  {
+    "page": "✅ ☑️ Buttons (без описания)",
+    "assets": 3,
+    "mb": 43,
+    "ms": 11667
+  },
+  {
+    "page": "✅ ☑️ Layout, Sidebar, breadcrumbs",
+    "assets": 20,
+    "mb": 34.2,
+    "ms": 10947
+  },
+  {
+    "page": "✅ ☑️ Dropdown, DropdownMenuItem (без описания)",
+    "assets": 11,
+    "mb": 27.9,
+    "ms": 11867
+  },
+  {
+    "page": "✅ Modal (без описания)",
+    "assets": 10,
+    "mb": 20.3,
+    "ms": 2929
+  },
+  {
+    "page": "✅ ☑️ Message (без описания)",
+    "assets": 1,
+    "mb": 18.1,
+    "ms": 940
+  },
+  {
+    "page": "Table",
+    "assets": 7,
+    "mb": 11.8,
+    "ms": 2195
+  },
+  {
+    "page": "✅ Textarea (без описания)",
+    "assets": 1,
+    "mb": 9.3,
+    "ms": 1439
+  },
+  {
+    "page": "✅ ☑️ Input (без описания)",
+    "assets": 4,
+    "mb": 8.8,
+    "ms": 1042
+  },
+  {
+    "page": "✅ ☑️ Toast (без описания)",
+    "assets": 1,
+    "mb": 8.7,
+    "ms": 701
+  },
+  {
+    "page": "✅ ☑️ Option-switcher",
+    "assets": 2,
+    "mb": 6.6,
+    "ms": 1606
+  },
+  {
+    "page": "Toolbar",
+    "assets": 7,
+    "mb": 4.8,
+    "ms": 882
+  },
+  {
+    "page": "✅ Toggle button (без описания)",
+    "assets": 1,
+    "mb": 4.5,
+    "ms": 907
+  },
+  {
+    "page": "✅ ☑️ Input Password (без описания)",
+    "assets": 1,
+    "mb": 3.4,
+    "ms": 497
+  },
+  {
+    "page": "✅ Input Datepicker, Calendar",
+    "assets": 4,
+    "mb": 3.2,
+    "ms": 623
+  },
+  {
+    "page": "✅ ☑️ Drawer (без описания)",
+    "assets": 5,
+    "mb": 2.9,
+    "ms": 323
+  },
+  {
+    "page": "✅ Badges (без описания)",
+    "assets": 3,
+    "mb": 2.7,
+    "ms": 550
+  },
+  {
+    "page": "✅ Uploading files",
+    "assets": 2,
+    "mb": 2.7,
+    "ms": 283
+  },
+  {
+    "page": "✅ ☑️ Status (без описания)",
+    "assets": 1,
+    "mb": 2.6,
+    "ms": 532
+  },
+  {
+    "page": "Stepper",
+    "assets": 8,
+    "mb": 2.1,
+    "ms": 252
+  },
+  {
+    "page": "✅  Tool tip (без описания)",
+    "assets": 2,
+    "mb": 2,
+    "ms": 153
+  },
+  {
+    "page": "Drag and drop",
+    "assets": 2,
+    "mb": 1.9,
+    "ms": 132
+  },
+  {
+    "page": "✅ Toggletip (без описания)",
+    "assets": 1,
+    "mb": 1.7,
+    "ms": 127
+  },
+  {
+    "page": "✅ ☑️ Checkbox (без описания)",
+    "assets": 3,
+    "mb": 1.6,
+    "ms": 322
+  },
+  {
+    "page": "✅ ☑️ RadioButton (без описания)",
+    "assets": 3,
+    "mb": 1.1,
+    "ms": 275
+  },
+  {
+    "page": "✅ Accordion status",
+    "assets": 1,
+    "mb": 1,
+    "ms": 191
+  },
+  {
+    "page": "Dialog",
+    "assets": 3,
+    "mb": 0.9,
+    "ms": 95
+  },
+  {
+    "page": "✅ ☑️ Pagination",
+    "assets": 4,
+    "mb": 0.8,
+    "ms": 194
+  },
+  {
+    "page": "Gaps",
+    "assets": 1,
+    "mb": 0.7,
+    "ms": 29
+  },
+  {
+    "page": "✅ ☑️ Input Number",
+    "assets": 1,
+    "mb": 0.7,
+    "ms": 269
+  },
+  {
+    "page": "✅ Zoom Controls (без описания)",
+    "assets": 2,
+    "mb": 0.7,
+    "ms": 215
+  },
+  {
+    "page": "Components",
+    "assets": 1,
+    "mb": 0.5,
+    "ms": 51
+  },
+  {
+    "page": "✅ Input Search",
+    "assets": 1,
+    "mb": 0.5,
+    "ms": 85
+  },
+  {
+    "page": "✅ ☑️ Switch (без описания)",
+    "assets": 3,
+    "mb": 0.5,
+    "ms": 137
+  },
+  {
+    "page": "✅ Tabs",
+    "assets": 2,
+    "mb": 0.5,
+    "ms": 61
+  },
+  {
+    "page": "✅ Card",
+    "assets": 2,
+    "mb": 0.4,
+    "ms": 23
+  },
+  {
+    "page": "list",
+    "assets": 2,
+    "mb": 0.4,
+    "ms": 31
+  },
+  {
+    "page": "✅ ☑️ Chip (без описания)",
+    "assets": 1,
+    "mb": 0.3,
+    "ms": 51
+  },
+  {
+    "page": "✅ Indicator",
+    "assets": 1,
+    "mb": 0.3,
+    "ms": 45
+  },
+  {
+    "page": "✅ ☑️ Scrollbar",
+    "assets": 1,
+    "mb": 0.3,
+    "ms": 27
+  },
+  {
+    "page": "✅ Progress",
+    "assets": 1,
+    "mb": 0.1,
+    "ms": 7
+  },
+  {
+    "page": "✅ Divider",
+    "assets": 1,
+    "mb": 0,
+    "ms": 2
+  }
+]
+ИТОГО: 234.5 MB по 41 страницам

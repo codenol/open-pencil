@@ -368,24 +368,25 @@ function buildCanvasEntries(
   }
 
   const hasSharedStyles = [...graph.nodes.values()].some((node) => node.sharedStyleType !== null)
-  // Если в графе нет явной служебной страницы, но есть компоненты/токены — Figma-совместимо
-  // создаём её. Отключается флагом noImplicitInternalCanvas (нарезка «только компоненты»).
-  if (
-    !noImplicitInternalCanvas &&
-    (graph.variableCollections.size > 0 || hasSharedStyles) &&
-    internalCanvasGuid === null
-  ) {
+  // Переменные Figma хранит на отдельной странице-носителе. Она нужна всегда, иначе
+  // привязки «заливка → токен» повиснут без самих токенов. При нарезке «только компоненты»
+  // (noImplicitInternalCanvas) она становится обычной видимой страницей.
+  if ((graph.variableCollections.size > 0 || hasSharedStyles) && internalCanvasGuid === null) {
     internalCanvasGuid = { sessionID: 0, localID: localIdCounter.value++ }
     assignedGuidValues.add(`${internalCanvasGuid.sessionID}:${internalCanvasGuid.localID}`)
     canvasEntries.push({
-      page: { id: '', name: 'Internal Only Canvas', internalOnly: true } as FigExportPage,
+      page: {
+        id: '',
+        name: noImplicitInternalCanvas ? 'Токены' : 'Internal Only Canvas',
+        internalOnly: !noImplicitInternalCanvas
+      } as FigExportPage,
       canvasGuid: internalCanvasGuid,
       canvasNc: makeCanvasNodeChange(
         internalCanvasGuid,
         docGuid,
         fractionalPosition(canvasEntries.length),
-        'Internal Only Canvas',
-        { internalOnly: true }
+        noImplicitInternalCanvas ? 'Токены' : 'Internal Only Canvas',
+        noImplicitInternalCanvas ? {} : { internalOnly: true }
       )
     })
   }
@@ -454,6 +455,7 @@ export async function exportFigFile(
   renderHeadlessThumbnail = false,
   options: { noImplicitInternalCanvas?: boolean } = {}
 ): Promise<Uint8Array> {
+  const noImplicitInternalCanvas = options.noImplicitInternalCanvas ?? false
   const originalArchive = await originalFigArchive(sourceGraph)
   if (originalArchive) return originalArchive.slice()
   const graph = cloneSceneGraphForFigExport(sourceGraph)
@@ -532,9 +534,8 @@ export async function exportFigFile(
     docGuid,
     localIdCounter,
     nodeIdToGuid,
-    assignedGuidValues
-  ,
-    options.noImplicitInternalCanvas ?? false
+    assignedGuidValues,
+    noImplicitInternalCanvas
   )
 
   // Assign variable GUIDs AFTER canvas entries so that source.id-derived
