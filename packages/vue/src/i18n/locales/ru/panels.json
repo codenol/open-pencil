@@ -376,5 +376,11 @@
   "replaceComponent": "Заменить компонент",
   "replaceComponentPlaceholder": "Выберите компонент…",
   "replaceComponentSearch": "Поиск компонентов…",
-  "replaceComponentEmpty": "Компоненты не найдены"
+  "replaceComponentEmpty": "Компоненты не найдены",
+  "docDescription": "Описание",
+  "docDescriptionHint": "Что это за компонент и зачем он",
+  "docGuidelines": "Как можно",
+  "docGuidelinesHint": "Когда использовать, с чем сочетать",
+  "docGuardrails": "Как нельзя",
+  "docGuardrailsHint": "Чего избегать, типовые ошибки"
 }
