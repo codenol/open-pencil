@@ -10,7 +10,7 @@ export const filesMessageDefaults = {
   importReplacesDocument: 'Import replaces the current document.',
   importing: 'Importing…',
   importToCanvas: 'Import to canvas',
-  newTab: 'New tab',
+  newTab: 'Files',
   closeTab: params('Close {name}'),
   unsavedChanges: 'Unsaved changes',
   saveBeforeClosing: params('Save changes to “{name}”?'),

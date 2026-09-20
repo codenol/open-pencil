@@ -6,7 +6,8 @@
  * Библиотеки: создать, открыть, переименовать, опубликовать / снять с публикации,
  * назначить подключаемой по умолчанию, удалить.
  */
-import { computed, onMounted } from 'vue'
+import { useLocalStorage } from '@vueuse/core'
+import { computed, onMounted, ref } from 'vue'
 
 import { useI18n } from '@open-pencil/vue'
 
@@ -22,6 +23,9 @@ import { createStorageWorkspaceSource } from '@/app/storage/workspace/source'
 import { openStorageDocumentInNewTab } from '@/app/tabs'
 import { useDocumentWorkspace } from '@open-pencil/vue'
 
+import { openFileFromPath } from '@/app/shell/menu/use'
+import { recentFiles, type RecentDocument } from '@/app/recent-files'
+import HomeSearchActions from './search/HomeSearchActions.vue'
 import type { RowAction } from './EntityTable.vue'
 import EntityTable from './EntityTable.vue'
 
@@ -38,6 +42,49 @@ const storage = useDocumentWorkspace<StorageDocument>({
 
 const documents = storage.documents
 const libraries = computed(() => libraryService.summaries.value)
+
+// Разделы: «Файлы» (недавние, потом все на сервере) и «Библиотеки».
+const activeSection = useLocalStorage<'files' | 'libraries'>(
+  'open-pencil:home-section',
+  'files'
+)
+const query = ref('')
+
+function matches(name: string): boolean {
+  const needle = query.value.trim().toLowerCase()
+  return needle.length === 0 || name.toLowerCase().includes(needle)
+}
+
+const visibleDocuments = computed(() => documents.value.filter((item) => matches(item.name)))
+
+// «Недавние» — то, что открывали в этом браузере. Показываем первыми.
+const recents = useDocumentWorkspace<RecentDocument>({
+  source: { async refresh() { return recentFiles.value }, loadPreview: () => Promise.resolve(null) },
+  refreshOnFocus: false
+})
+const visibleRecents = computed(() => recents.documents.value.filter((item) => matches(item.name)))
+
+const sections = computed(() => [
+  { value: 'files' as const, label: files.value.filesTitle },
+  { value: 'libraries' as const, label: files.value.libraries }
+])
+
+const recentRows = computed(() =>
+  visibleRecents.value.map((document) => ({
+    id: document.id,
+    cells: [document.name, formattedDate(document.updatedAt)]
+  }))
+)
+
+function openRecentFile(id: string) {
+  void openFileFromPath(id)
+}
+
+function openServerFile(id: string) {
+  const document = documents.value.find((item) => item.id === id)
+  if (document) void openStorageDocumentInNewTab(document)
+}
+const visibleLibraries = computed(() => libraries.value.filter((item) => matches(item.name)))
 
 
 onMounted(() => {
@@ -58,7 +105,7 @@ async function removeDocument(id: string) {
 }
 
 const fileRows = computed(() =>
-  documents.value.map((document) => ({
+  visibleDocuments.value.map((document) => ({
     id: document.id,
     cells: [document.name, formattedDate(document.updatedAt)]
   }))
@@ -88,7 +135,7 @@ function fileActions(rowId: string): RowAction[] {
 }
 
 const libraryRows = computed(() =>
-  libraries.value.map((library) => ({
+  visibleLibraries.value.map((library) => ({
     id: library.libraryId,
     cells: [
       library.name,
@@ -154,58 +201,90 @@ function formattedDate(updatedAt: string): string {
 <template>
   <main class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-app text-surface">
     <section
-      class="mx-auto flex w-full max-w-7xl flex-col gap-7 px-4 py-5 sm:px-6"
+      class="mx-auto flex w-full max-w-7xl flex-col px-4 py-4 sm:px-6 sm:py-5"
       data-test-id="files-home"
     >
-      <div class="flex items-center justify-between gap-3">
-        <h1 class="text-base font-semibold">{{ files.filesTitle }}</h1>
-        <div class="flex items-center gap-2">
+      <HomeSearchActions v-model="query" @new-document="emit('new-document')" />
+
+      <div class="mt-4 mb-6 flex items-center gap-1 border-b border-border" role="tablist">
+        <button
+          v-for="section in sections"
+          :key="section.value"
+          type="button"
+          role="tab"
+          :aria-selected="activeSection === section.value"
+          :data-test-id="`home-section-${section.value}`"
+          class="relative px-3 py-2 text-xs text-muted hover:text-surface aria-selected:font-semibold aria-selected:text-surface after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:rounded-full after:bg-transparent aria-selected:after:bg-accent"
+          @click="activeSection = section.value"
+        >
+          {{ section.label }}
+        </button>
+      </div>
+
+      <template v-if="activeSection === 'files'">
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <h2 class="text-base font-semibold">{{ files.recentFiles }}</h2>
           <AppButton color="neutral" size="sm" @click="emit('new-document')">
             <icon-lucide-plus class="size-3.5" />
             {{ files.newFile }}
           </AppButton>
+        </div>
+        <p
+          v-if="visibleRecents.length === 0"
+          class="mb-7 rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted"
+        >
+          {{ files.noRecentFilesDescription }}
+        </p>
+        <EntityTable
+          v-else
+          class="mb-7"
+          :columns="[files.columnName, files.columnUpdated]"
+          :rows="recentRows"
+          :actions="fileActions"
+          :menu-label="common.actions"
+          @open="openRecentFile"
+        />
+
+        <h2 class="mb-3 text-base font-semibold">{{ files.filesTitle }}</h2>
+        <p
+          v-if="visibleDocuments.length === 0"
+          class="rounded-lg border border-dashed border-border px-4 py-4 text-center text-xs text-muted"
+        >
+          {{ files.noFilesDescription }}
+        </p>
+        <EntityTable
+          v-else
+          :columns="[files.columnName, files.columnUpdated]"
+          :rows="fileRows"
+          :actions="fileActions"
+          :menu-label="common.actions"
+          @open="openServerFile"
+        />
+      </template>
+
+      <template v-else>
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <h2 class="text-base font-semibold">{{ files.libraries }}</h2>
           <AppButton color="neutral" size="sm" @click="openPublishLibraryDialog()">
             <icon-lucide-plus class="size-3.5" />
             {{ files.createLibrary }}
           </AppButton>
         </div>
-      </div>
-
-      <p
-        v-if="documents.length === 0"
-        class="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted"
-      >
-        {{ files.noFilesDescription }}
-      </p>
-      <EntityTable
-        v-else
-        :columns="[files.columnName, files.columnUpdated]"
-        :rows="fileRows"
-        :actions="fileActions"
-        :menu-label="common.actions"
-        @open="(id) => {
-          const document = documents.find((item) => item.id === id)
-          if (document) void openStorageDocumentInNewTab(document)
-        }"
-      />
-
-      <div class="flex items-center justify-between gap-3">
-        <h2 class="text-base font-semibold">{{ files.libraries }}</h2>
-      </div>
-      <EntityTable
-        v-if="libraryRows.length"
-        :columns="[files.columnName, files.libraryAssets, files.libraryStatus]"
-        :rows="libraryRows"
-        :actions="libraryActions"
-        :menu-label="common.actions"
-        @open="openLibraryAsFile"
-      />
-      <p
-        v-else
-        class="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted"
-      >
-        {{ files.noLibrariesHint }}
-      </p>
+        <EntityTable
+          v-if="libraryRows.length"
+          :columns="[files.columnName, files.libraryAssets, files.libraryStatus]"
+          :rows="libraryRows"
+          :actions="libraryActions"
+          :menu-label="common.actions"
+          @open="openLibraryAsFile"
+        />
+        <p
+          v-else
+          class="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted"
+        >
+          {{ files.noLibrariesHint }}
+        </p>
+      </template>
     </section>
   </main>
 </template>
