@@ -30,7 +30,12 @@ import {
 import { isTauri } from '@/app/tauri/env'
 import { exportFigFile } from '@open-pencil/core/io/formats/fig'
 
-import { libraryManagerDialogOpen, libraryManagerInitialSection } from '@/app/libraries'
+import {
+  defaultLibraryId,
+  libraryManagerDialogOpen,
+  libraryManagerInitialSection,
+  useLibraryService
+} from '@/app/libraries'
 import { persistStorageCanvasLocally } from '@/app/storage/sync/persist'
 import { kickSyncEngine } from '@/app/storage/sync/engine'
 import { useUrlSync } from '@/app/url/sync'
@@ -80,6 +85,17 @@ async function createDocumentOnServer(): Promise<void> {
     })
     store.setStorageDocumentSource({ providerId: 'norka-server', documentId }, name)
     void kickSyncEngine()
+
+    // Библиотека по умолчанию подключается к каждому новому файлу —
+    // дизайнер сразу видит компоненты ДС, не подключая их вручную.
+    const libraryId = defaultLibraryId.value
+    if (libraryId) {
+      try {
+        await useLibraryService().enable(store, libraryId)
+      } catch (error) {
+        console.warn('[New document] не удалось подключить библиотеку по умолчанию', error)
+      }
+    }
   } catch (error) {
     console.error('[New document] не удалось создать файл на сервере', error)
     toast.error(

@@ -59,6 +59,13 @@ export function createServerStorageAdapter(_runtime: StorageProviderRuntime): St
         objects: { key: string; size: number | null; etag: string | null }[]
       }
       return payload.objects
+    },
+
+    async removeObject(key) {
+      const response = await fetch(`${BASE}/objects?key=${encodeURIComponent(key)}`, {
+        method: 'DELETE'
+      })
+      if (!response.ok) throw new Error(`Сервер: ${response.status}`)
     }
   }
 

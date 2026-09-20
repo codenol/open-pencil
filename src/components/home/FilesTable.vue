@@ -6,11 +6,16 @@
  * Библиотеки: создать, открыть, переименовать, опубликовать / снять с публикации,
  * назначить подключаемой по умолчанию, удалить.
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 
 import { useI18n } from '@open-pencil/vue'
 
-import { openLibraryAsFile, openPublishLibraryDialog, useLibraryService } from '@/app/libraries'
+import {
+  defaultLibraryId,
+  openLibraryAsFile,
+  openPublishLibraryDialog,
+  useLibraryService
+} from '@/app/libraries'
 import { activeStorageProviderID, type StorageDocument } from '@/app/integrations/storage'
 import { createActiveStorageAdapter } from '@/app/integrations/storage/runtime'
 import { createStorageWorkspaceSource } from '@/app/storage/workspace/source'
@@ -34,7 +39,6 @@ const storage = useDocumentWorkspace<StorageDocument>({
 const documents = storage.documents
 const libraries = computed(() => libraryService.summaries.value)
 
-const defaultLibraryId = ref<string | null>(null)
 
 onMounted(() => {
   void storage.refresh()
@@ -118,13 +122,27 @@ function libraryActions(rowId: string): RowAction[] {
       }
     },
     {
+      id: 'unpublish',
+      label: files.value.unpublishLibrary,
+      separatorBefore: true,
+      onSelect: () => void unpublishLibrary(rowId)
+    },
+    {
       id: 'delete',
       label: common.value.delete,
       danger: true,
-      separatorBefore: true,
       onSelect: () => void libraryService.removeLibrary(rowId)
     }
   ]
+}
+
+/**
+ * Снятие с публикации: библиотека пропадает из списка опубликованных и больше
+ * не предлагается для подключения. Локальная копия остаётся — можно вернуть.
+ */
+async function unpublishLibrary(libraryId: string) {
+  await libraryService.removeLibrary(libraryId)
+  await libraryService.listLibraries()
 }
 
 function formattedDate(updatedAt: string): string {

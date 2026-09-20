@@ -61,6 +61,8 @@ export interface LibraryObjectStore {
     options?: LibraryObjectWriteOptions
   ): Promise<void>
   listObjects(prefix: string): Promise<LibraryObjectSummary[]>
+  /** Удаление объекта (нужно для снятия библиотеки с публикации). */
+  removeObject?(key: string): Promise<void>
 }
 
 export interface StorageAdapter {
