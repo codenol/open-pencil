@@ -31,6 +31,15 @@ const emit = defineEmits<{ 'new-document': [] }>()
 const { panels, locale, files, common } = useI18n()
 const { isMobile } = useViewportKind()
 const view = useLocalStorage<'grid' | 'list'>('open-pencil:home-files-view', 'grid')
+// Два раздела стартового экрана: «Файлы» (недавние + на сервере) и «Библиотеки».
+const activeSection = useLocalStorage<'files' | 'libraries'>(
+  'open-pencil:home-section',
+  'files'
+)
+const sections = computed(() => [
+  { value: 'files' as const, label: files.value.filesTitle },
+  { value: 'libraries' as const, label: files.value.libraries }
+])
 const query = ref('')
 const openError = ref<string | null>(null)
 
@@ -175,6 +184,21 @@ function formattedDate(updatedAt: string): string {
     >
       <HomeSearchActions v-model="query" @new-document="emit('new-document')" />
 
+      <div class="mt-4 mb-6 flex items-center gap-1 border-b border-border" role="tablist">
+        <button
+          v-for="section in sections"
+          :key="section.value"
+          type="button"
+          role="tab"
+          :aria-selected="activeSection === section.value"
+          :data-test-id="`home-section-${section.value}`"
+          class="relative px-3 py-2 text-xs text-muted hover:text-surface aria-selected:font-semibold aria-selected:text-surface after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:rounded-full after:bg-transparent aria-selected:after:bg-accent"
+          @click="activeSection = section.value"
+        >
+          {{ section.label }}
+        </button>
+      </div>
+
       <p v-if="openError" class="mb-4 text-xs text-danger" role="alert">{{ openError }}</p>
       <p
         v-if="noSearchMatches"
@@ -183,10 +207,82 @@ function formattedDate(updatedAt: string): string {
         {{ files.noMatchingFiles({ query: query.trim() }) }}
       </p>
 
-      <section v-if="!noSearchMatches" class="mb-7">
+      <section v-if="!noSearchMatches && activeSection === 'files'">
+        <div class="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
+          <div class="col-span-2 min-w-0 sm:col-span-1">
+            <h1 class="text-base font-semibold">{{ files.recentFiles }}</h1>
+            <p class="mt-0.5 text-pretty text-xs text-muted">{{ files.recentFilesDescription }}</p>
+          </div>
+          <div class="col-span-2 flex items-center justify-end gap-1 sm:col-span-1">
+            <IconButton
+              v-if="hasRecentFiles"
+              :label="common.clear"
+              class="size-10 sm:size-7"
+              data-test-id="recent-files-clear"
+              @click="clearRecentFiles"
+            >
+              <icon-lucide-trash-2 class="size-3.5" />
+            </IconButton>
+            <SegmentedControl
+              v-model="view"
+              required
+              :label="files.recentFiles"
+              :size="isMobile ? 'touch' : 'md'"
+              :options="[
+                { value: 'grid', label: panels.gridView },
+                { value: 'list', label: panels.listView }
+              ]"
+            >
+              <template #option="{ option }">
+                <icon-lucide-layout-grid v-if="option.value === 'grid'" class="size-3.5" />
+                <icon-lucide-list v-else class="size-3.5" />
+              </template>
+            </SegmentedControl>
+          </div>
+        </div>
+
+        <div
+          v-if="filteredRecentFiles.length && view === 'grid'"
+          class="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"
+        >
+          <DocumentEntry
+            v-for="document in filteredRecentFiles"
+            :key="document.id"
+            v-workspace-preview="document.id"
+            :name="document.name"
+            :metadata="formattedDate(document.updatedAt)"
+            :previewURL="previewURL(document.id)"
+            @open="openRecent(document)"
+          />
+        </div>
+
+        <div
+          v-else-if="filteredRecentFiles.length"
+          class="overflow-hidden rounded-lg border border-border"
+        >
+          <DocumentEntry
+            v-for="document in filteredRecentFiles"
+            :key="document.id"
+            view="list"
+            :name="document.name"
+            :metadata="formattedDate(document.updatedAt)"
+            @open="openRecent(document)"
+          />
+        </div>
+
+        <div
+          v-else-if="!normalizedQuery"
+          class="rounded-lg border border-dashed border-border px-4 py-4 text-center sm:py-6"
+        >
+          <p class="text-xs font-medium">{{ files.noRecentFiles }}</p>
+          <p class="mt-1 text-xs text-muted">{{ files.noRecentFilesDescription }}</p>
+        </div>
+      </section>
+
+      <section v-if="!noSearchMatches && activeSection === 'files'" class="mt-7">
         <div class="mb-3 flex items-start gap-3">
           <div class="min-w-0">
-            <h1 class="text-base font-semibold">{{ files.filesTitle }}</h1>
+            <h2 class="text-base font-semibold">{{ files.filesTitle }}</h2>
             <p class="mt-0.5 text-xs text-muted">{{ files.filesDescription }}</p>
           </div>
           <div class="ml-auto flex shrink-0 items-center gap-1">
@@ -265,79 +361,7 @@ function formattedDate(updatedAt: string): string {
         </div>
       </section>
 
-      <section v-if="!noSearchMatches">
-        <div class="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
-          <div class="col-span-2 min-w-0 sm:col-span-1">
-            <h1 class="text-base font-semibold">{{ files.recentFiles }}</h1>
-            <p class="mt-0.5 text-pretty text-xs text-muted">{{ files.recentFilesDescription }}</p>
-          </div>
-          <div class="col-span-2 flex items-center justify-end gap-1 sm:col-span-1">
-            <IconButton
-              v-if="hasRecentFiles"
-              :label="common.clear"
-              class="size-10 sm:size-7"
-              data-test-id="recent-files-clear"
-              @click="clearRecentFiles"
-            >
-              <icon-lucide-trash-2 class="size-3.5" />
-            </IconButton>
-            <SegmentedControl
-              v-model="view"
-              required
-              :label="files.recentFiles"
-              :size="isMobile ? 'touch' : 'md'"
-              :options="[
-                { value: 'grid', label: panels.gridView },
-                { value: 'list', label: panels.listView }
-              ]"
-            >
-              <template #option="{ option }">
-                <icon-lucide-layout-grid v-if="option.value === 'grid'" class="size-3.5" />
-                <icon-lucide-list v-else class="size-3.5" />
-              </template>
-            </SegmentedControl>
-          </div>
-        </div>
-
-        <div
-          v-if="filteredRecentFiles.length && view === 'grid'"
-          class="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"
-        >
-          <DocumentEntry
-            v-for="document in filteredRecentFiles"
-            :key="document.id"
-            v-workspace-preview="document.id"
-            :name="document.name"
-            :metadata="formattedDate(document.updatedAt)"
-            :previewURL="previewURL(document.id)"
-            @open="openRecent(document)"
-          />
-        </div>
-
-        <div
-          v-else-if="filteredRecentFiles.length"
-          class="overflow-hidden rounded-lg border border-border"
-        >
-          <DocumentEntry
-            v-for="document in filteredRecentFiles"
-            :key="document.id"
-            view="list"
-            :name="document.name"
-            :metadata="formattedDate(document.updatedAt)"
-            @open="openRecent(document)"
-          />
-        </div>
-
-        <div
-          v-else-if="!normalizedQuery"
-          class="rounded-lg border border-dashed border-border px-4 py-4 text-center sm:py-6"
-        >
-          <p class="text-xs font-medium">{{ files.noRecentFiles }}</p>
-          <p class="mt-1 text-xs text-muted">{{ files.noRecentFilesDescription }}</p>
-        </div>
-      </section>
-
-      <section class="mt-7">
+      <section v-if="activeSection === 'libraries'" data-test-id="home-libraries-section">
         <div class="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
           <div class="min-w-0">
             <h2 class="text-base font-semibold">{{ files.libraries }}</h2>
