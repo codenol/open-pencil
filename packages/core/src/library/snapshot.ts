@@ -120,6 +120,14 @@ export function extractLibrarySnapshot(
   }
   remapSnapshotReferences(snapshot, mappedIds)
 
+  // Переменные (токены) и их коллекции: без них в библиотеке теряются привязки
+  // «заливка → токен» — у компонентов пустая секция Fill.
+  for (const [id, variable] of source.variables) snapshot.variables.set(id, variable)
+  for (const [id, collection] of source.variableCollections) {
+    snapshot.variableCollections.set(id, collection)
+  }
+  for (const [modeId, value] of source.activeMode) snapshot.activeMode.set(modeId, value)
+
   for (const imageHash of new Set(
     [...closure].flatMap((id) => {
       const node = source.getNode(id)

@@ -43,6 +43,14 @@ for (const file of SOURCES) {
     if (node.parentId && source.getNode(node.parentId)?.type === 'COMPONENT_SET') continue
     roots.push(node.id)
   }
+  // Переменные (токены) переносим вместе с компонентами: без них заливки,
+  // привязанные к токенам, теряются и секция Fill у компонентов пустая.
+  for (const [id, variable] of source.variables) target.variables.set(id, variable)
+  for (const [id, collection] of source.variableCollections) {
+    target.variableCollections.set(id, collection)
+  }
+  for (const [modeId, value] of source.activeMode) target.activeMode.set(modeId, value)
+
   // Переносим поддеревья в общий граф. Копируем только переносимые поля:
   // createNode сам выдаёт id и выставляет родителя.
   const TRANSIENT = new Set(['id', 'parentId', 'childIds', 'source'])

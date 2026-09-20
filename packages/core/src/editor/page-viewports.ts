@@ -11,7 +11,10 @@ interface PageViewport {
   pageColor: Color
 }
 
-export function createPageViewportStore(ctx: EditorContext) {
+export function createPageViewportStore(
+  ctx: EditorContext,
+  deps: { zoomToPage?: (pageId: string) => boolean } = {}
+) {
   const pageViewports = new Map<string, PageViewport>()
 
   function saveCurrentPageViewport() {
@@ -30,6 +33,15 @@ export function createPageViewportStore(ctx: EditorContext) {
       ctx.state.panY = viewport.panY
       ctx.state.zoom = viewport.zoom
       ctx.state.pageColor = { ...viewport.pageColor }
+      return
+    }
+
+    // Для страницы ещё нет сохранённого вида. Раньше показывали начало координат —
+    // и файл выглядел пустым, хотя данные на месте. Теперь вписываем содержимое.
+    ctx.state.pageColor = { ...CANVAS_BG_COLOR }
+    const nodes = ctx.graph.getChildren(pageId)
+    if (nodes.length > 0) {
+      deps.zoomToPage?.(pageId)
       return
     }
 

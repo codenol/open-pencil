@@ -217,7 +217,7 @@ export function createEditor(options?: EditorOptions) {
   // Assemble domain modules
   const viewport = createViewportActions(ctx)
   const selection = createSelectionActions(ctx)
-  const pages = createPageActions(ctx)
+  const pages = createPageActions(ctx, { zoomToPage: viewport.zoomToPage })
   const guides = createGuideActions(ctx)
   const shapes = createShapeActions(ctx)
   const structure = createStructureActions(ctx)
