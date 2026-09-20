@@ -12,7 +12,7 @@ import {
   type RecentDocument
 } from '@/app/recent-files'
 import { openFileFromPath } from '@/app/shell/menu/use'
-import { openLibraryManagerDialog, useLibraryService } from '@/app/libraries'
+import { openLibraryManagerDialog, openPublishLibraryDialog, useLibraryService } from '@/app/libraries'
 import {
   activeStorageProviderID,
   storagePreferencesComplete,
@@ -66,6 +66,9 @@ const filteredRecentFiles = computed(() => {
 })
 const libraryService = useLibraryService()
 const libraries = computed(() => libraryService.summaries.value)
+// Кнопка «Создать библиотеку» ведёт в диалог публикации: библиотека собирается
+// из открытого документа. С появлением библиотек список ниже станет непустым.
+const canPublishCurrentDocument = computed(() => true)
 const libraryCovers = ref<Record<string, string | null>>({})
 
 function libraryCoverURL(libraryId: string, revisionId: string): string | null {
@@ -335,11 +338,21 @@ function formattedDate(updatedAt: string): string {
       </section>
 
       <section class="mt-7">
-        <div class="mb-3 flex items-start gap-3">
+        <div class="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
           <div class="min-w-0">
             <h2 class="text-base font-semibold">{{ files.libraries }}</h2>
             <p class="mt-0.5 text-xs text-muted">{{ files.librariesDescription }}</p>
           </div>
+          <AppButton
+            v-if="canPublishCurrentDocument"
+            color="neutral"
+            size="sm"
+            data-test-id="home-publish-library"
+            @click="openPublishLibraryDialog()"
+          >
+            <icon-lucide-plus class="size-3.5" />
+            {{ files.createLibrary }}
+          </AppButton>
         </div>
 
         <div
@@ -377,6 +390,7 @@ function formattedDate(updatedAt: string): string {
           class="rounded-lg border border-dashed border-border px-4 py-4 text-center sm:py-6"
         >
           <p class="text-xs font-medium">{{ files.noLibraries }}</p>
+          <p class="mt-1 text-xs text-muted">{{ files.noLibrariesHint }}</p>
         </div>
       </section>
 
