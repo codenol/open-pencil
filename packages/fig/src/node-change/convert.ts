@@ -1163,17 +1163,33 @@ export const FIGMA_RAW_NODE_FIELD_KEYS = [
   'strokeGeometry'
 ] as const satisfies readonly (keyof NodeChange)[]
 
+// Сырьё Figma храним выборочно. Полный набор съедает гигабайты памяти
+// (2.5 ГБ на 10 МБ файл) из-за геометрии и глифов, но совсем без сырья
+// теряется текст: при повторном открытии он читается именно отсюда.
+// Оставляем поля, влияющие на содержимое и вид, без геометрии и глифов.
+const DROPPED_RAW_GEOMETRY_KEYS = new Set([
+  'fillGeometry',
+  'strokeGeometry',
+  'vectorData',
+  'derivedTextData',
+  'derivedSymbolData',
+  'derivedSymbolDataLayoutVersion'
+])
+
 function extractFigmaRawGeometry(
   nc: NodeChange,
   blobs: Uint8Array[]
 ): Pick<SceneNode['source']['fig'], 'rawSize' | 'rawTransform' | 'rawNodeFields'> {
-  // Сырьё Figma (rawNodeFields) не храним: экспорт обратно в Figma не нужен,
-  // а на больших файлах оно съедает гигабайты памяти (2.5 ГБ на 10 МБ файл).
-  // Оставляем только размер/трансформ — они нужны лейаутам.
+  const rawNodeFields: Record<string, unknown> = {}
+  for (const key of FIGMA_RAW_NODE_FIELD_KEYS) {
+    if (DROPPED_RAW_GEOMETRY_KEYS.has(key)) continue
+    const value = nc[key as keyof NodeChange]
+    if (value !== undefined && value !== null) rawNodeFields[key] = value
+  }
   return {
     rawSize: nc.size ? { ...nc.size } : null,
     rawTransform: nc.transform ? { ...nc.transform } : null,
-    rawNodeFields: {}
+    rawNodeFields
   }
 }
 
