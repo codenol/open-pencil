@@ -235,7 +235,7 @@ onUnmounted(() => {
     <LibraryManagerDialog v-model="libraryManagerDialogOpen" :initial-section="libraryManagerInitialSection" />
     <MatchDialog />
     <CommandPalette />
-    <TabBar />
+    <TabBar @new-document="createDocumentOnServer" />
     <HomeWorkspace v-show="activeTab?.kind === 'home'" @new-document="createDocumentOnServer" />
     <EditorWorkspace v-if="activeTab?.kind !== 'home'" />
   </div>

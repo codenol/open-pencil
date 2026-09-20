@@ -5,7 +5,7 @@ import { computed } from 'vue'
 
 import { useI18n } from '@open-pencil/vue'
 
-import { useTabsStore, createHomeTab } from '@/app/tabs'
+import { useTabsStore } from '@/app/tabs'
 import PreparationIndicator from '@/components/preparation/tab/Indicator.vue'
 import IconButton from '@/components/ui/button/IconButton.vue'
 import Tip from '@/components/ui/overlay/Tip.vue'
@@ -22,14 +22,18 @@ const modelValue = computed({
   set: (id: string) => switchTab(id)
 })
 
+const emit = defineEmits<{ 'new-document': [] }>()
+
+/** «+» создаёт новый файл — как кнопка «Новый файл» на стартовом экране. */
 function createNewTab(event: MouseEvent): void {
   event.preventDefault()
   if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur()
-  createHomeTab()
+  emit('new-document')
 }
 
 function onMiddleClick(e: MouseEvent, tabId: string, isHome: boolean) {
-  if (e.button === 1 && (!isHome || tabs.value.length > 1)) {
+  // «Файлы» — закреплённая вкладка, средним кликом тоже не закрывается.
+  if (e.button === 1 && !isHome) {
     e.preventDefault()
     void closeTab(tabId)
   }
@@ -72,7 +76,7 @@ function onClose(e: MouseEvent, tabId: string) {
           </Tip>
         </TabsTrigger>
         <Tip
-          v-if="!tab.isHome || tabs.length > 1"
+          v-if="!tab.isHome"
           :label="files.closeTab({ name: tab.isHome ? files.newTab : tab.name })"
         >
           <button
@@ -89,7 +93,7 @@ function onClose(e: MouseEvent, tabId: string) {
         </Tip>
       </div>
     </TabsList>
-    <IconButton :label="files.newTab" size="md" data-test-id="tabbar-new" @click="createNewTab">
+    <IconButton :label="files.newFile" size="md" data-test-id="tabbar-new" @click="createNewTab">
       <icon-lucide-plus :class="baseStyles.newIcon()" />
     </IconButton>
   </TabsRoot>

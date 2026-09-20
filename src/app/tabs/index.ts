@@ -114,9 +114,13 @@ export function createTab(
   return tab
 }
 
+/**
+ * Вкладка «Файлы» — закреплённая: всегда первая, всегда видима, не закрывается.
+ * Это точка входа: открой любой файл, но вернуться к списку можно всегда.
+ */
 export function createHomeTab(): Tab {
   const tab: Tab = { id: generateTabId(), store: createEditorStore(), kind: 'home' }
-  tabsRef.value = [...tabsRef.value, tab]
+  tabsRef.value = [tab, ...tabsRef.value]
   activateTab(tab)
   return tab
 }
@@ -169,7 +173,8 @@ export async function closeTab(tabId: string): Promise<void> {
   if (idx === -1) return
 
   const closingTab = tabsRef.value[idx]
-  if (closingTab.kind === 'home' && tabsRef.value.length === 1) return
+  // «Файлы» — закреплённая вкладка: её нельзя закрыть.
+  if (closingTab.kind === 'home') return
   const choice = await requestDocumentClose(closingTab.store, closingTab.store.state.documentName)
   if (choice === 'cancel') return
   if (choice === 'discard') await closingTab.store.discardRecovery()
