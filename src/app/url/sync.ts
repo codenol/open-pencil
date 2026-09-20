@@ -38,10 +38,55 @@ export function documentUrlKey(tab: Tab): string {
   }
 }
 
+/**
+ * Имя страницы для адреса: читаемое и стабильное. Figma использует имя, а не id,
+ * поэтому по ссылке видно, куда она ведёт. Одинаковые имена разводим суффиксом.
+ */
+function pageSlug(store: EditorStore, pageId: string): string {
+  const page = store.graph.getNode(pageId)
+  if (!page) return ''
+  const base =
+    page.name
+      .trim()
+      .replace(/[/\\?#]+/g, '-')
+      .replace(/\s+/g, '-')
+      .slice(0, 60) || 'page'
+  const siblings = store.graph
+    .getPages()
+    .filter((other) => other.id !== pageId && slugOf(other.name) === base)
+  return siblings.length > 0 ? `${base}-${pageId.replace(/[^\w]/g, '')}` : base
+}
+
+function slugOf(name: string): string {
+  return name
+    .trim()
+    .replace(/[/\\?#]+/g, '-')
+    .replace(/\s+/g, '-')
+    .slice(0, 60) || 'page'
+}
+
+/** Страница по имени из адреса (или по id — старые ссылки продолжают работать). */
+function findPageBySlug(store: EditorStore, slug: string): string | null {
+  const byId = store.graph.getNode(slug)
+  if (byId?.type === 'CANVAS') return byId.id
+  const decoded = decodeURIComponent(slug)
+  const pages = store.graph.getPages()
+  const exact = pages.find((page) => slugOf(page.name) === decoded)
+  if (exact) return exact.id
+  const prefixed = pages.find((page) => decoded.startsWith(slugOf(page.name) + '-'))
+  return prefixed?.id ?? null
+}
+
+function isLibraryTab(tab: Tab): boolean {
+  return (tab as { kind?: string }).kind === 'library'
+}
+
 function fileUrl(tab: Tab): string {
   const key = encodeURIComponent(documentUrlKey(tab))
+  const base = isLibraryTab(tab) ? '/lib' : '/file'
   const pageId = (tab.store.state as { currentPageId?: string }).currentPageId
-  return pageId ? `/file/${key}/${encodeURIComponent(pageId)}` : `/file/${key}`
+  const slug = pageId ? pageSlug(tab.store, pageId) : ''
+  return slug ? `${base}/${key}/${encodeURIComponent(slug)}` : `${base}/${key}`
 }
 
 function findTabByKey(key: string): Tab | undefined {
@@ -101,11 +146,13 @@ export function useUrlSync(router: Router): void {
       if (route.path === FILES_PATH) showHomeTab()
       return
     }
-    const pageId = typeof route.params.pageId === 'string' ? route.params.pageId : ''
+    const pageSlug =
+    typeof route.params.pageSlug === 'string' ? route.params.pageSlug : ''
 
     const existing = findTabByKey(fileId)
     if (existing) {
       if (activeTab.value?.id !== existing.id) switchTab(existing.id)
+      const pageId = pageSlug ? findPageBySlug(existing.store, pageSlug) : null
       if (pageId) await activatePage(existing.store, pageId)
       return
     }
@@ -146,7 +193,11 @@ export function useUrlSync(router: Router): void {
           }
         }
       }
-      if (pageId) await activatePage(getActiveStore(), pageId)
+      if (pageSlug) {
+        const store = getActiveStore()
+        const pageId = findPageBySlug(store, pageSlug)
+        if (pageId) await activatePage(store, pageId)
+      }
     } catch (error) {
       console.warn('[URL sync] не удалось открыть файл', fileId, error)
     } finally {
