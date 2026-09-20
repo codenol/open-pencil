@@ -156,6 +156,8 @@ export function createDefaultNode(
     isPublishable: false,
     isSymbolPublishable: false,
     symbolDescription: '',
+    symbolGuidelines: '',
+    symbolGuardrails: '',
     symbolLinks: [],
     variantPropSpecs: [],
     boundVariables: {},

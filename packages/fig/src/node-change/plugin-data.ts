@@ -20,6 +20,7 @@ export const NODE_TYPE_PLUGIN_KEY = 'nodeType'
 export const BOUND_VARIABLES_PLUGIN_KEY = 'boundVariables'
 export const EXPORT_SETTINGS_PLUGIN_KEY = 'exportSettings'
 export const TEXT_PATH_BOX_PLUGIN_KEY = 'textPathBox'
+export const DOCUMENTATION_PLUGIN_KEY = 'documentation'
 export const LIBRARY_SOURCE_PLUGIN_KEY = 'librarySource'
 export const ENABLED_LIBRARIES_PLUGIN_KEY = 'enabledLibraries'
 
@@ -284,4 +285,32 @@ export function serializePluginRelaunchData(
     message: entry.message,
     isDeleted: entry.isDeleted
   }))
+}
+
+/** Гайдлайны и гардрейлы компонента: часть документации, хранится вместе с ним. */
+export function applyDocumentationPluginData(
+  node: Pick<SceneNode, 'symbolGuidelines' | 'symbolGuardrails' | 'pluginData'>
+): void {
+  if (!node.symbolGuidelines && !node.symbolGuardrails) return
+  upsertPluginData(
+    node,
+    DOCUMENTATION_PLUGIN_KEY,
+    JSON.stringify({ guidelines: node.symbolGuidelines, guardrails: node.symbolGuardrails })
+  )
+}
+
+/** Читает документацию компонента из pluginData (для импорта). */
+export function readDocumentationFromPluginData(
+  pluginData: PluginDataEntry[]
+): { guidelines: string; guardrails: string } {
+  const entry = pluginData.find(
+    (item) => item.pluginId === OPEN_PENCIL_PLUGIN_ID && item.key === DOCUMENTATION_PLUGIN_KEY
+  )
+  if (!entry) return { guidelines: '', guardrails: '' }
+  try {
+    const parsed = JSON.parse(entry.value) as { guidelines?: string; guardrails?: string }
+    return { guidelines: parsed.guidelines ?? '', guardrails: parsed.guardrails ?? '' }
+  } catch {
+    return { guidelines: '', guardrails: '' }
+  }
 }

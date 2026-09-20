@@ -19,6 +19,7 @@ import {
   extractLibrarySource,
   extractTextPathBox,
   extractPluginData,
+  readDocumentationFromPluginData,
   extractPluginRelaunchData,
   getOpenPencilPluginValue,
   LAYOUT_DIRECTION_PLUGIN_KEY,
@@ -944,6 +945,7 @@ function extractComponentMetadata(nc: NodeChange): ComponentMetadataProps {
     isPublishable: booleanOrFalse(nc.isPublishable),
     isSymbolPublishable: booleanOrFalse(nc.isSymbolPublishable),
     symbolDescription: stringOrEmpty(nc.symbolDescription),
+    ...readDocumentationFromPluginData(extractPluginData(nc)),
     symbolLinks: symbolLinks
       .filter((link): link is SymbolLink => typeof link.uri === 'string')
       .map((link) => ({
