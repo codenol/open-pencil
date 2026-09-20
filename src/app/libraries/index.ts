@@ -18,3 +18,4 @@ export { closeLibraryReview, libraryReviewRequest, openLibraryReview } from './r
 export type { LibraryReviewRequest } from './review'
 export { LibraryService, useLibraryService } from './service'
 export type { EnabledLibraryAsset } from './service'
+export { openLibraryAsFile } from './open-as-file'

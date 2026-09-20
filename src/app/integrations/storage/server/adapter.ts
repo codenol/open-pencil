@@ -118,6 +118,15 @@ export function createServerStorageAdapter(_runtime: StorageProviderRuntime): St
       await request(`/files/${encodeURIComponent(id)}`, { method: 'DELETE' })
     },
 
+    async renameDocument(id, name) {
+      const response = await fetch(`${BASE}/files/${encodeURIComponent(id)}/metadata`, {
+        method: 'PATCH',
+        headers: { 'x-document-name': encodeURIComponent(name) },
+        body: new Uint8Array()
+      })
+      if (!response.ok) throw new Error(`Сервер: ${response.status}`)
+    },
+
     async getUsage(): Promise<StorageUsage> {
       const response = await request('/usage')
       return (await response.json()) as StorageUsage
