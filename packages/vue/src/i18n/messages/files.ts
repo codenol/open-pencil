@@ -33,6 +33,8 @@ export const filesMessageDefaults = {
   libraries: 'Libraries',
   librariesDescription: 'Published component libraries you can browse and use.',
   noLibraries: 'No published libraries yet',
+  createLibrary: 'Create library',
+  noLibrariesHint: 'Open a file with components and create a library from it — then you can connect it in any other file.',
   libraryAssetCount: params('Components: {count}'),
   recentFiles: 'Recent files',
   recentFilesDescription: 'Continue working on a design or start a new one.',
