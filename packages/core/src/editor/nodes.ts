@@ -25,6 +25,8 @@ export function createNodeActions(ctx: EditorContext) {
   const variableBindingActions = createVariableBindingActions(ctx)
 
   function updateNode(id: string, changes: Partial<SceneNode>) {
+    // Режим просмотра: смотреть можно, менять нельзя.
+    if (ctx.state.viewOnly) return
     const node = ctx.graph.getNode(id)
     if (!node) return
     // Path-edit last so its reflowed glyphs win over auto-resize's glyph clear
@@ -39,6 +41,8 @@ export function createNodeActions(ctx: EditorContext) {
   }
 
   function updateNodeWithUndo(id: string, changes: Partial<SceneNode>, label = 'Update') {
+    // Режим просмотра: смотреть можно, менять нельзя.
+    if (ctx.state.viewOnly) return
     const node = ctx.graph.getNode(id)
     if (!node) return
     // Same ordering rationale as updateNode: reflowed path-text glyphs win.

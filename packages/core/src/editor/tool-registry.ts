@@ -8,6 +8,8 @@ export interface EditorToolDef {
 }
 
 export const EDITOR_TOOLS: EditorToolDef[] = [
+  // «Рука» — первый инструмент и режим по умолчанию: смотреть можно, править нет.
+  { key: 'HAND', label: 'Hand', shortcut: 'H' },
   { key: 'SELECT', label: 'Move', shortcut: 'V' },
   { key: 'FRAME', label: 'Frame', shortcut: 'F', flyout: ['FRAME', 'SECTION'] },
   {
@@ -17,8 +19,7 @@ export const EDITOR_TOOLS: EditorToolDef[] = [
     flyout: ['RECTANGLE', 'LINE', 'ELLIPSE', 'POLYGON', 'STAR']
   },
   { key: 'PEN', label: 'Pen', shortcut: 'P' },
-  { key: 'TEXT', label: 'Text', shortcut: 'T' },
-  { key: 'HAND', label: 'Hand', shortcut: 'H' }
+  { key: 'TEXT', label: 'Text', shortcut: 'T' }
 ]
 
 export const TOOL_SHORTCUTS: Partial<Record<string, Tool>> = {

@@ -36,6 +36,11 @@ export type Tool =
 
 export interface EditorSharedState {
   activeTool: Tool
+  /**
+   * «Рука» — режим просмотра: смотреть и выделять можно, менять нельзя.
+   * Выводится из активного инструмента, чтобы не расходиться с ним.
+   */
+  viewOnly: boolean
   snappingPreferences: SnappingPreferences
   remoteCursors: Array<{
     name: string
