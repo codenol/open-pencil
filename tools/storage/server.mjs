@@ -36,7 +36,7 @@ const SAFE_ID = /^[A-Za-z0-9._:-]{1,180}$/
 function send(res, status, body, headers = {}) {
   res.writeHead(status, {
     'access-control-allow-origin': '*',
-    'access-control-allow-methods': 'GET, PUT, DELETE, OPTIONS',
+    'access-control-allow-methods': 'GET, PUT, PATCH, DELETE, OPTIONS',
     'access-control-allow-headers': '*',
     ...headers
   })
@@ -95,6 +95,7 @@ async function listDocuments() {
     out.push({
       id,
       name: meta.name ?? id,
+      kind: meta.kind ?? 'design',
       updatedAt: meta.updatedAt ?? info?.mtime?.toISOString() ?? null,
       size: info?.size ?? null,
       hasThumbnail: await fileExists(join(DIRS.thumbs, `${id}.png`))
@@ -141,8 +142,16 @@ const server = createServer(async (req, res) => {
         if (body.length === 0) return sendJson(res, 400, { error: 'empty body' })
         await writeFile(file, body)
         const name = req.headers['x-document-name']
+        const kindHeader = req.headers['x-document-kind']
+        const previous = (await readMeta(id)) ?? {}
+        // Тип файла: макет или библиотека. Из него строится адрес.
+        const kind =
+          typeof kindHeader === 'string' && (kindHeader === 'library' || kindHeader === 'design')
+            ? kindHeader
+            : previous.kind ?? 'design'
         const meta = {
-          name: typeof name === 'string' && name ? decodeURIComponent(name) : id,
+          name: typeof name === 'string' && name ? decodeURIComponent(name) : previous.name ?? id,
+          kind,
           updatedAt: new Date().toISOString()
         }
         await writeMeta(id, meta)
@@ -158,12 +167,32 @@ const server = createServer(async (req, res) => {
     }
 
     const metaMatch = path.match(/^\/api\/documents\/([^/]+)\/metadata$/)
-    if (metaMatch && req.method === 'GET') {
+    if (metaMatch) {
       const id = decodeURIComponent(metaMatch[1])
       if (!SAFE_ID.test(id)) return sendJson(res, 400, { error: 'bad id' })
-      const meta = await readMeta(id)
-      if (!meta) return sendJson(res, 404, { error: 'not found' })
-      return sendJson(res, 200, { id, ...meta })
+
+      if (req.method === 'GET') {
+        const meta = await readMeta(id)
+        if (!meta) return sendJson(res, 404, { error: 'not found' })
+        return sendJson(res, 200, { id, kind: meta.kind ?? 'design', ...meta })
+      }
+
+      // Смена типа файла: макет ↔ библиотека. Меняет адрес файла.
+      if (req.method === 'PATCH') {
+        const raw = await readBody(req)
+        let payload = {}
+        try {
+          payload = JSON.parse(raw.toString('utf8') || '{}')
+        } catch {
+          return sendJson(res, 400, { error: 'bad json' })
+        }
+        const meta = (await readMeta(id)) ?? {}
+        if (payload.kind === 'library' || payload.kind === 'design') meta.kind = payload.kind
+        if (typeof payload.name === 'string' && payload.name) meta.name = payload.name
+        meta.updatedAt = new Date().toISOString()
+        await writeMeta(id, meta)
+        return sendJson(res, 200, { ok: true, id, ...meta })
+      }
     }
 
     const thumbMatch = path.match(/^\/api\/documents\/([^/]+)\/thumbnail$/)
