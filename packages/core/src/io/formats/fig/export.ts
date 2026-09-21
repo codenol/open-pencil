@@ -353,7 +353,10 @@ function buildCanvasEntries(
     const canvasNc = makeCanvasNodeChange(
       canvasGuid,
       docGuid,
-      page.source.orderKey ?? fractionalPosition(p),
+      // Порядок страниц берём из текущего места в документе, а не из ключа,
+      // сохранённого при импорте: после перестановки старый ключ врал бы, и
+      // файл открывался бы в прежнем порядке.
+      fractionalPosition(p),
       page.name,
       {
         backgroundOpacity: 1,
