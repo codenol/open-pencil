@@ -22,6 +22,56 @@ export interface RuleViolation {
 /** Маркеры, которыми в дизайн-системе помечены несделанные замены. */
 const PLACEHOLDER_MARKERS = new Set(['wine'])
 
+/**
+ * Компоненты-носители: иконка допустима только внутри одного из них.
+ * Список по именам компонентов дизайн-системы; сравнение без учёта регистра.
+ */
+const ICON_CARRIER_NAMES = [
+  'button',
+  'button-icon-action',
+  'input',
+  'input search',
+  'input password',
+  'input number',
+  'input datepicker',
+  'menuitem',
+  'menu button',
+  'submenu-item',
+  'context-menu-item',
+  'chip',
+  'badge',
+  'endcontent',
+  'status indicator_spectr',
+  'toggle button',
+  'option-switcher'
+]
+
+/**
+ * Ищет носителя иконки вверх по дереву. Инстанс, компонент или сет с именем
+ * из списка носителей. Просто рамка или страница носителем не считается.
+ */
+function hasIconCarrier(graph: SceneGraph, node: SceneNode): boolean {
+  let current = node.parentId ? graph.getNode(node.parentId) : null
+  let hops = 0
+  while (current && hops < 12) {
+    const name = current.name.trim().toLowerCase()
+    const isUnit = current.type === 'COMPONENT' || current.type === 'COMPONENT_SET' ||
+      current.type === 'INSTANCE'
+    if (isUnit && ICON_CARRIER_NAMES.includes(name)) return true
+    // Имя варианта вида «State=Default, Type=Filled…» — проверяем по сету.
+    if (isUnit && current.parentId) {
+      const owner = graph.getNode(current.parentId)
+      if (owner?.type === 'COMPONENT_SET') {
+        const ownerName = owner.name.trim().toLowerCase()
+        if (ICON_CARRIER_NAMES.includes(ownerName)) return true
+      }
+    }
+    current = current.parentId ? graph.getNode(current.parentId) : null
+    hops += 1
+  }
+  return false
+}
+
 const ICON_MAX_SIZE = 48
 
 function collectSubtree(graph: SceneGraph, rootIds: string[]): SceneNode[] {
@@ -71,20 +121,19 @@ export function detectRuleViolations(
       continue
     }
 
-    // Иконка не должна существовать сама по себе.
+    // Иконка не должна существовать сама по себе: нужен носитель — кнопка,
+    // поле, пункт меню, бейдж. Просто «есть родитель» не считается: иконка
+    // в углу карточки тоже имеет родителя, но носителем он не является.
     const looksLikeIcon =
       node.name.trim().toLowerCase() === 'icon' ||
       (node.width <= ICON_MAX_SIZE && node.height <= ICON_MAX_SIZE && node.type === 'INSTANCE')
     if (looksLikeIcon && node.type === 'INSTANCE') {
-      const parent = node.parentId ? graph.getNode(node.parentId) : null
-      const insideComponent =
-        parent && (parent.type === 'COMPONENT' || parent.type === 'COMPONENT_SET')
-      if (!parent || (!insideComponent && parent.type !== 'FRAME')) {
+      if (!hasIconCarrier(graph, node)) {
         violations.push({
-          severity: 'warning',
+          severity: 'error',
           component: target.name,
           node: node.name.trim(),
-          message: `Иконка «${node.name.trim()}» стоит сама по себе — нужна в составе кнопки, поля или пункта меню`,
+          message: `Иконка «${node.name.trim()}» стоит сама по себе — нужна в составе кнопки, поля, пункта меню или бейджа`,
           rule: ruleText('сам по себе') || 'Иконка не берётся сама по себе'
         })
       }

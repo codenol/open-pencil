@@ -28,7 +28,8 @@ const MAX_BODY = 200 * 1024 * 1024
 const DIRS = {
   files: join(ROOT, 'files'),
   meta: join(ROOT, 'meta'),
-  thumbs: join(ROOT, 'thumbs')
+  thumbs: join(ROOT, 'thumbs'),
+  chats: join(ROOT, 'chats')
 }
 
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,180}$/
@@ -209,6 +210,74 @@ const server = createServer(async (req, res) => {
         const body = await readBody(req)
         await writeFile(file, body)
         return sendJson(res, 200, { ok: true, id })
+      }
+    }
+
+    // --- Логи чата, привязанные к файлу ---
+    const chatListMatch = path.match(/^\/api\/chats\/([^/]+)$/)
+    if (chatListMatch && req.method === 'GET') {
+      const documentId = decodeURIComponent(chatListMatch[1])
+      if (!SAFE_ID.test(documentId)) return sendJson(res, 400, { error: 'bad id' })
+      const dir = join(DIRS.chats, documentId)
+      let names = []
+      try {
+        names = await readdir(dir)
+      } catch {
+        return sendJson(res, 200, { conversations: [] })
+      }
+      const conversations = []
+      for (const name of names) {
+        if (!name.endsWith('.json')) continue
+        try {
+          const raw = await readFile(join(dir, name), 'utf8')
+          const parsed = JSON.parse(raw)
+          conversations.push({
+            id: parsed.id,
+            documentId: parsed.documentId,
+            documentName: parsed.documentName,
+            title: parsed.title,
+            createdAt: parsed.createdAt,
+            updatedAt: parsed.updatedAt,
+            messageCount: Array.isArray(parsed.messages) ? parsed.messages.length : 0
+          })
+        } catch {
+          // битый файл пропускаем
+        }
+      }
+      conversations.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+      return sendJson(res, 200, { conversations })
+    }
+
+    const chatItemMatch = path.match(/^\/api\/chats\/([^/]+)\/([^/]+)$/)
+    if (chatItemMatch) {
+      const documentId = decodeURIComponent(chatItemMatch[1])
+      const conversationId = decodeURIComponent(chatItemMatch[2])
+      if (!SAFE_ID.test(documentId) || !SAFE_ID.test(conversationId)) {
+        return sendJson(res, 400, { error: 'bad id' })
+      }
+      const dir = join(DIRS.chats, documentId)
+      const file = join(dir, `${conversationId}.json`)
+
+      if (req.method === 'GET') {
+        if (!(await fileExists(file))) return sendJson(res, 404, { error: 'not found' })
+        const raw = await readFile(file, 'utf8')
+        return send(res, 200, raw, {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store'
+        })
+      }
+
+      if (req.method === 'PUT') {
+        const body = await readBody(req)
+        if (body.length === 0) return sendJson(res, 400, { error: 'empty body' })
+        await mkdir(dir, { recursive: true })
+        await writeFile(file, body)
+        return sendJson(res, 200, { ok: true, documentId, conversationId, size: body.length })
+      }
+
+      if (req.method === 'DELETE') {
+        await unlink(file).catch(() => {})
+        return sendJson(res, 200, { ok: true })
       }
     }
 

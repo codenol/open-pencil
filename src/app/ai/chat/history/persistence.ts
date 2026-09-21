@@ -3,6 +3,7 @@ import { ref, type Ref } from 'vue'
 
 import { fallbackTitle, snapshotMessages } from './messages'
 import type { Conversation, ConversationStore } from './types'
+import { uploadConversation } from './upload'
 
 interface PersistenceOptions {
   store: ConversationStore
@@ -41,6 +42,9 @@ export function createHistoryPersistence(options: PersistenceOptions) {
         await options.store.write(snapshot)
         await options.store.select(snapshot.documentId, snapshot.id)
         storageError.value = false
+        // Тихо выгружаем лог на сервер рядом с файлом: ошибка выгрузки не
+        // должна мешать чату, она вспомогательная.
+        void uploadConversation(snapshot)
         await options.refresh()
         return undefined
       })
