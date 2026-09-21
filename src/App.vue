@@ -31,7 +31,7 @@ const { updates, locale } = useI18n()
 // Заголовок вкладки всегда несёт номер и время сборки — иначе не отличить
 // старую сборку в кэше от новой. Название документа идёт первым, когда есть.
 useHead({
-  titleTemplate: (title) => (title ? `${title} — ${buildLabel}` : `OpenPencil · ${buildLabel}`),
+  titleTemplate: (title) => (title ? `${title} — ${buildLabel}` : buildLabel),
   htmlAttrs: {
     lang: locale,
     'data-motion': computed(() => (animationsEnabled.value ? 'full' : 'off'))
