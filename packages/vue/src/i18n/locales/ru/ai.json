@@ -148,5 +148,6 @@
   "reasoningWhileThinking": "Разворачивать во время размышлений",
   "reasoningExpanded": "Развёрнуто по умолчанию",
   "jumpToLatest": "К последнему сообщению",
-  "maxAgentStepsCustom": "Своё значение…"
+  "maxAgentStepsCustom": "Своё значение…",
+  "assistantWorking": "Ассистент работает…"
 }

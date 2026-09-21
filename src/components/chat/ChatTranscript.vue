@@ -42,7 +42,10 @@ const viewport = computed(() => viewportComponent.value?.viewportElement)
 const { arrivedState, resumeFollowing } = useScrollFollowing(
   viewport,
   transcriptContent,
-  computed(() => status === 'submitted')
+  // Следим за ответом всё время работы: и пока запрос отправлен, и пока
+  // текст печатается. Раньше следили только за отправкой, поэтому при
+  // появлении ответа прокрутка оставалась на месте.
+  computed(() => status === 'submitted' || status === 'streaming')
 )
 </script>
 

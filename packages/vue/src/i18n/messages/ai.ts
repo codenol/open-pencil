@@ -58,6 +58,7 @@ export const aiMessageDefaults = {
   getProviderAPIKey: params('Get an {provider} API key →'),
   oneKeyManyModels: 'One key for 100+ models from all providers.',
   describeChange: 'Describe a change…',
+  assistantWorking: 'Assistant is working…',
   describeCreateOrChange: 'Describe what you want to create or change.',
   stopGenerating: 'Stop generating',
   sendMessage: 'Send message',
