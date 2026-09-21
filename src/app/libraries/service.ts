@@ -158,10 +158,21 @@ export class LibraryService implements ComponentCatalog {
   async refresh(editor: EditorStore): Promise<void> {
     this.#activeEditor = editor
     this.#summaries.value = await this.#catalog.listLibraries()
+
+    // Ревизии включённых библиотек тянем параллельно: последовательная
+    // загрузка заставляла ассеты появляться по одному и очень медленно.
+    const bindings = [...editor.graph.enabledLibraries.values()].filter(
+      (binding) => binding.enabled
+    )
+    const revisions = await Promise.all(
+      bindings.map(async (binding) => ({
+        binding,
+        revision: await this.#getRevision(binding.libraryId, binding.revisionId)
+      }))
+    )
+
     const assets: EnabledLibraryAsset[] = []
-    for (const binding of editor.graph.enabledLibraries.values()) {
-      if (!binding.enabled) continue
-      const revision = await this.#getRevision(binding.libraryId, binding.revisionId)
+    for (const { binding, revision } of revisions) {
       assets.push(
         ...revision.manifest.assets.map((asset) => ({
           libraryId: binding.libraryId,
