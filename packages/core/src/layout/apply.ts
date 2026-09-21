@@ -87,7 +87,12 @@ function computedChildSize(
   axis: 'width' | 'height',
   preservesImportedFrameGeometry: boolean
 ): number {
-  if (preservesImportedFrameGeometry || preservesStaleImportedTextSize(child, axis)) {
+  // Сохранённую геометрию уважаем, но не когда человек явно попросил
+  // «Заполнение» — тогда растяжение важнее исходного размера из файла.
+  const askedToFill =
+    child.layoutGrow > 0 ||
+    child.layoutAlignSelf === 'STRETCH'
+  if ((preservesImportedFrameGeometry && !askedToFill) || preservesStaleImportedTextSize(child, axis)) {
     return child[axis]
   }
   const computed = axis === 'width' ? yogaChild.getComputedWidth() : yogaChild.getComputedHeight()
