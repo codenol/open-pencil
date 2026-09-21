@@ -110,6 +110,7 @@ export const panelMessageDefaults = {
   noLocalComponents: 'No local components',
   componentSet: 'Component set',
   component: 'Component',
+  insertInstanceWithProperties: 'Insert with these values',
   insertInstance: 'Insert instance',
   description: 'Description',
   documentation: 'Documentation',

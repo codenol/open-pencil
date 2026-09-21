@@ -2,10 +2,28 @@ import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
 import type { LayerNode, LayerRow, LayerSelectionMode } from '#vue/primitives/LayerTree/context'
 
-function nodeToLayerNode(node: SceneNode): LayerNode {
+/**
+ * Имя для списка слоёв.
+ *
+ * У инстанса показываем имя компонента, а не варианта: `Property 1=Default`
+ * ничего не говорит о том, что это за элемент. Смена варианта меняет
+ * внешний вид, но имя в слоях остаётся прежним — «Sidebar» остаётся
+ * «Sidebar», даже когда он стал узким.
+ */
+function layerNodeName(graph: SceneGraph, node: SceneNode): string {
+  if (node.type !== 'INSTANCE' || !node.componentId) return node.name
+  const master = graph.getNode(node.componentId)
+  if (!master) return node.name
+  // Вариант лежит внутри сета: берём имя сета.
+  const owner = master.parentId ? graph.getNode(master.parentId) : null
+  if (owner?.type === 'COMPONENT_SET') return owner.name
+  return master.name
+}
+
+function nodeToLayerNode(graph: SceneGraph, node: SceneNode): LayerNode {
   return {
     id: node.id,
-    name: node.name,
+    name: layerNodeName(graph, node),
     type: node.type,
     layoutMode: node.layoutMode,
     visible: node.visible,
@@ -28,7 +46,7 @@ export function buildLayerTreeModel(graph: SceneGraph, parentId: string): LayerT
     for (const childId of parent.childIds) {
       const sceneNode = graph.getNode(childId)
       if (!sceneNode || sceneNode.internalOnly) continue
-      const node = nodeToLayerNode(sceneNode)
+      const node = nodeToLayerNode(graph, sceneNode)
       byId.set(node.id, node)
       if (sceneNode.childIds.length > 0) node.children = buildChildren(node.id)
       children.push(node)

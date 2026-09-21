@@ -385,7 +385,7 @@ async function insertSelectedAsset() {
                     ? 'flex min-w-0 flex-col items-center gap-1 p-1.5'
                     : 'flex w-full items-center gap-2 px-1.5 py-1'
                 ]"
-                @click="openDetails(asset)"
+                @click="insertAsset(asset)"
                 @keydown="onAssetKeydown($event, asset)"
                 @dragstart="onDragStart($event, asset)"
               >
