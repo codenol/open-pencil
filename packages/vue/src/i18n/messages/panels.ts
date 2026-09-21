@@ -15,6 +15,13 @@ export const panelMessageDefaults = {
   rulesDescription:
     'When to use this component, when not to, what may be changed and what must stay as is.',
   rulesEmpty: 'No rules yet. They will appear here.',
+  rulesSections: {
+    use: 'When to use',
+    avoid: 'When not to use',
+    allowed: 'What may be changed',
+    forbidden: 'What must not be changed',
+    checks: 'Checks before finishing'
+  },
   assets: 'Assets',
   searchLocalComponents: 'Search local components',
   assetView: 'Asset view',
