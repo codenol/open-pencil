@@ -36,12 +36,12 @@ function moscowStamp(date = new Date()) {
 export function buildLabelPlugin({ number, reuse = false } = {}) {
   const build = reuse && number ? number : nextBuildNumber()
   const { day, time } = moscowStamp()
-  const label = `сборка ${build} · ${day} ${time} МСК`
+  const label = `сборка ${build} · ${time} · ${day}`
 
   return {
     name: 'open-pencil:build-label',
     transformIndexHtml(html) {
-      return html.replace(/<title>([^<]*)<\/title>/, `<title>OpenPencil (${label})</title>`)
+      return html.replace(/<title>([^<]*)<\/title>/, `<title>${label}</title>`)
     },
     config() {
       return {
