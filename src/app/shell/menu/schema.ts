@@ -66,12 +66,14 @@ export const APP_MENU_SCHEMA = [
     paletteIcon: 'file',
     items: [
       { id: 'new', label: 'New', shortcut: 'MOD+N' },
-      { id: 'open', label: 'Open…', shortcut: 'MOD+O' },
-      { id: 'open-recent', label: 'Open Recent', target: 'native' },
-      { id: 'open-storage-workspace', label: 'Open Storage Workspace…', handler: 'shell' },
+      // Основной поток: файлы на сервере рядом с редактором.
+      { id: 'open-storage-workspace', label: 'Файлы на сервере', shortcut: 'MOD+O', handler: 'shell' },
+      // Обмен с локальным компьютером — отдельно от серверной работы.
+      { id: 'open', label: 'Загрузить с ПК…', handler: 'shell' },
       { type: 'separator' },
-      { id: 'save', label: 'Save', shortcut: 'MOD+S' },
-      { id: 'save-as', label: 'Save As…', shortcut: 'MOD+SHIFT+S' },
+      { id: 'save', label: 'Сохранить', shortcut: 'MOD+S' },
+      { id: 'save-as', label: 'Скачать на ПК…', shortcut: 'MOD+SHIFT+S' },
+      { id: 'open-recent', label: 'Открытые ранее', target: 'native' },
       { type: 'separator' },
       {
         id: 'export-selection',

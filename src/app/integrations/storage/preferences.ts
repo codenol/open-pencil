@@ -5,9 +5,10 @@ import type { StorageFieldID, StorageProviderID } from './types'
 
 export type StoragePreferences = Record<StorageProviderID, Record<StorageFieldID, string>>
 
+// По умолчанию — хранилище норки: файлы на нашем сервере, без настройки.
 export const activeStorageProviderID = useLocalStorage<StorageProviderID>(
   'open-pencil:storage:provider',
-  's3-compatible'
+  'norka-server'
 )
 
 const storedPreferences = useLocalStorage<StoragePreferences>('open-pencil:storage:preferences', {})
