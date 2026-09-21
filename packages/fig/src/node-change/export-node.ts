@@ -974,7 +974,10 @@ export function sceneNodeToKiwiWithContext(
     guid,
     parentIndex: {
       guid: parentGuid,
-      position: node.source.orderKey ?? context.fractionalPosition(childIndex)
+      // Позицию берём из текущего порядка детей, а не из ключа, сохранённого
+      // при импорте: после перестановки узлов старый ключ врал бы, и файл
+      // открывался бы в прежнем порядке — правка пропадала бы после перезагрузки.
+      position: context.fractionalPosition(childIndex)
     },
     type: exportType,
     name: node.name,
