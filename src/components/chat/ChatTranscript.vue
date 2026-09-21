@@ -36,6 +36,33 @@ const isThinking = computed(() => {
     return true
   return status === 'submitted'
 })
+/**
+ * Что происходит прямо сейчас.
+ *
+ * Между шагами ассистент молчит по 10–20 секунд, и без подписи работа
+ * выглядит зависшей. Показываем текущее действие словами: видно, что процесс
+ * идёт, а не встал.
+ */
+const currentActivity = computed(() => {
+  if (!running.value) return null
+  const last = messages.at(-1)
+  if (status === 'submitted' && (!last || last.role !== 'assistant')) return ai.value.thinking
+  if (!last || last.role !== 'assistant') return ai.value.thinking
+  const part = last.parts.at(-1)
+  if (!part || part.type === 'step-start') return ai.value.thinking
+  if (typeof part.type === 'string' && part.type.startsWith('tool-')) {
+    const name = part.type.slice('tool-'.length)
+    const state = 'state' in part ? part.state : undefined
+    return state === 'input-available' ? ai.value.workingOn({ tool: name }) : ai.value.thinking
+  }
+  if ('toolCallId' in part) {
+    const state = part.state
+    const name = 'toolName' in part ? String(part.toolName) : 'tool'
+    return state === 'input-available' ? ai.value.workingOn({ tool: name }) : ai.value.thinking
+  }
+  return ai.value.thinking
+})
+
 const transcriptContent = ref<HTMLDivElement>()
 const viewportComponent = ref<{ viewportElement?: HTMLElement }>()
 const viewport = computed(() => viewportComponent.value?.viewportElement)
@@ -80,7 +107,9 @@ const { arrivedState, resumeFollowing } = useScrollFollowing(
           >
             AI
           </div>
-          <div class="flex items-center gap-1 py-2">
+          <div class="flex items-center gap-2 py-2">
+            <span v-if="currentActivity" class="text-xs text-muted">{{ currentActivity }}</span>
+            <span class="flex items-center gap-1">
             <span
               class="size-1.5 animate-bounce motion-reduce:animate-none rounded-full bg-muted"
             />
@@ -92,6 +121,7 @@ const { arrivedState, resumeFollowing } = useScrollFollowing(
               class="size-1.5 animate-bounce motion-reduce:animate-none rounded-full bg-muted"
               :style="{ animationDelay: '300ms' }"
             />
+            </span>
           </div>
         </div>
 

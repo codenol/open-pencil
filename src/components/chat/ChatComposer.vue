@@ -2,7 +2,7 @@
 import { useTextareaAutosize } from '@vueuse/core'
 import type { ChatStatus } from 'ai'
 import { TooltipProvider } from 'reka-ui'
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 
 import { useI18n } from '@open-pencil/vue'
 
@@ -20,6 +20,36 @@ const textarea = ref<HTMLTextAreaElement>()
 const input = ref('')
 const { triggerResize } = useTextareaAutosize({ element: textarea, input, maxHeight: 160 })
 const isStreaming = computed(() => disabled || status === 'streaming' || status === 'submitted')
+
+/**
+ * Сколько идёт текущая работа.
+ *
+ * Отправка и сборка занимают минуты, и без счётчика непонятно, идёт процесс
+ * или встал. Считаем от начала работы и обнуляем по её окончании.
+ */
+const elapsed = ref(0)
+let timer: ReturnType<typeof setInterval> | undefined
+
+watch(isStreaming, (active) => {
+  clearInterval(timer)
+  if (!active) {
+    elapsed.value = 0
+    return
+  }
+  const startedAt = Date.now()
+  elapsed.value = 0
+  timer = setInterval(() => (elapsed.value = Date.now() - startedAt), 1000)
+})
+
+onScopeDispose(() => clearInterval(timer))
+
+/** Минуты и секунды: `1:07`, `0:12`. */
+const elapsedLabel = computed(() => {
+  const total = Math.floor(elapsed.value / 1000)
+  const minutes = Math.floor(total / 60)
+  const seconds = total % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+})
 function handleInputKeydown(event: KeyboardEvent) {
   if (event.code !== 'Enter' || event.shiftKey || event.isComposing) return
   event.preventDefault()
@@ -62,6 +92,13 @@ function handleSubmit(event: Event) {
           <template #model><slot name="model" /></template>
 
           <template #actions>
+            <span
+              v-if="isStreaming && elapsed > 0"
+              data-test-id="chat-elapsed"
+              class="mr-0.5 text-[11px] tabular-nums text-muted"
+            >
+              {{ elapsedLabel }}
+            </span>
             <IconButton
               :label="ai.providerSettings"
               size="sm"
