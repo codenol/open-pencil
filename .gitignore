@@ -90,3 +90,6 @@ scratch/
 
 # OpenCode
 .opencode/
+
+# счётчик сборок — личный для каждой установки
+vite/.build-number
