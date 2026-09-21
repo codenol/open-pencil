@@ -7,6 +7,7 @@ import {
   canUseFigPopulationWorker,
   createFigPopulationWorker
 } from '#core/kiwi/fig/population/client'
+import { releaseOriginalFigArchive } from '#core/kiwi/fig/session/original-archive'
 import { computeAllLayouts } from '#core/layout'
 import { fontManager } from '#core/text/fonts'
 import { collectGraphFontRequirements } from '#core/text/requirements'
@@ -222,9 +223,13 @@ export function createPageActions(ctx: EditorContext) {
     if (nextIndex === currentIndex) return
 
     ctx.graph.insertChildAt(pageId, ctx.graph.rootId, nextIndex)
+    // Порядок страниц тоже меняет документ: без сброса исходного архива
+    // сохранение отдало бы файл со старым порядком.
+    releaseOriginalFigArchive(ctx.graph)
   }
 
   function renamePage(pageId: string, name: string) {
+    releaseOriginalFigArchive(ctx.graph)
     ctx.graph.updateNode(pageId, { name })
   }
 
