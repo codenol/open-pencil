@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useHead } from '@unhead/vue'
+
+import { buildLabel } from '@/app/build-label'
 import { useEventListener } from '@vueuse/core'
 import { MotionConfig } from 'motion-v'
 import { TooltipProvider } from 'reka-ui'
@@ -26,8 +28,10 @@ import AppToast from '@/components/shell/AppToast.vue'
 const store = useEditorStore()
 const { updates, locale } = useI18n()
 
+// Заголовок вкладки всегда несёт номер и время сборки — иначе не отличить
+// старую сборку в кэше от новой. Название документа идёт первым, когда есть.
 useHead({
-  titleTemplate: (title) => (title ? `${title} — OpenPencil` : 'OpenPencil'),
+  titleTemplate: (title) => (title ? `${title} — ${buildLabel}` : `OpenPencil · ${buildLabel}`),
   htmlAttrs: {
     lang: locale,
     'data-motion': computed(() => (animationsEnabled.value ? 'full' : 'off'))

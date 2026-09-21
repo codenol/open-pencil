@@ -12,3 +12,7 @@ declare module '*.vue' {
   const component: DefineComponent<object, object, unknown>
   export default component
 }
+
+// Подставляется плагином vite/build-label.ts при сборке.
+declare const __BUILD_LABEL__: string
+declare const __BUILD_NUMBER__: string
