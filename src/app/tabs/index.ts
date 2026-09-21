@@ -126,6 +126,14 @@ export function createDocumentInCurrentTab(): Tab {
 }
 
 export function showNewTab(): void {
+  // Домашний таб держим первым: список файлов — точка входа.
+  const ordered = [...tabsRef.value].sort((a, b) => {
+    if (a.kind === 'home') return -1
+    if (b.kind === 'home') return 1
+    return 0
+  })
+  if (ordered.some((tab, index) => tab !== tabsRef.value[index])) tabsRef.value = ordered
+
   const homeTab = tabsRef.value.find((tab) => tab.kind === 'home')
   if (homeTab) {
     switchTab(homeTab.id)
@@ -145,12 +153,27 @@ function activateTab(tab: Tab) {
   setOpenPencilStore(tab.store)
 }
 
+/**
+ * Адрес списка файлов. Закреплённый таб «Файлы» всегда ведёт сюда, и это
+ * единственный адрес списка — из него открываются документы.
+ */
+export const FILES_ROUTE = '/files'
+
 /** Activates the tab. False when no tab carries that id, so callers can tell a no-op apart. */
 export function switchTab(tabId: string): boolean {
   const tab = tabsRef.value.find((t) => t.id === tabId)
   if (!tab) return false
   activateTab(tab)
+  // Домашний таб — это список файлов, у него свой адрес.
+  if (tab.kind === 'home') syncFilesRoute()
   return true
+}
+
+/** Ставит адрес списка файлов, не трогая остальную навигацию. */
+function syncFilesRoute(): void {
+  if (typeof window === 'undefined') return
+  if (window.location.pathname === FILES_ROUTE) return
+  window.history.pushState(null, '', FILES_ROUTE)
 }
 
 export async function closeTab(tabId: string): Promise<void> {
@@ -158,7 +181,9 @@ export async function closeTab(tabId: string): Promise<void> {
   if (idx === -1) return
 
   const closingTab = tabsRef.value[idx]
-  if (closingTab.kind === 'home' && tabsRef.value.length === 1) return
+  // Таб «Файлы» закреплён: его нельзя закрыть ничем — ни кнопкой, ни Ctrl+W,
+  // ни средним кликом. Список файлов должен быть доступен всегда.
+  if (closingTab.kind === 'home') return
   const choice = await requestDocumentClose(closingTab.store, closingTab.store.state.documentName)
   if (choice === 'cancel') return
   if (choice === 'discard') await closingTab.store.discardRecovery()
