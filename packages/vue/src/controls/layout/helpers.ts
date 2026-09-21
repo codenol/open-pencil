@@ -194,10 +194,20 @@ export function axisSizingPatchForNode(
     }
   } else if (axis === 'width') {
     if (node.counterAxisSizing === 'HUG') patch.counterAxisSizing = 'FIXED'
-    if (isInAutoLayout) patch.layoutGrow = sizing === 'FILL' ? 1 : 0
+    if (isInAutoLayout) {
+      // «Заполнение» ставит то поле, которое отвечает за эту ось:
+      // по главной оси растяжение — layoutGrow, поперёк — layoutAlignSelf.
+      // Раньше ширина всегда писалась в layoutGrow, поэтому в колонке
+      // «Заполнение по ширине» ни на что не влияло.
+      if (node.layoutMode === 'VERTICAL') patch.layoutAlignSelf = sizing === 'FILL' ? 'STRETCH' : 'AUTO'
+      else patch.layoutGrow = sizing === 'FILL' ? 1 : 0
+    }
   } else {
     if (node.primaryAxisSizing === 'HUG') patch.primaryAxisSizing = 'FIXED'
-    if (isInAutoLayout) patch.layoutAlignSelf = sizing === 'FILL' ? 'STRETCH' : 'AUTO'
+    if (isInAutoLayout) {
+      if (node.layoutMode === 'HORIZONTAL') patch.layoutAlignSelf = sizing === 'FILL' ? 'STRETCH' : 'AUTO'
+      else patch.layoutGrow = sizing === 'FILL' ? 1 : 0
+    }
   }
   return patch
 }
