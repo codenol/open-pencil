@@ -105,13 +105,18 @@ function computedChildSize(
 function updateChildFromYoga(graph: SceneGraph, child: SceneNode, yogaChild: YogaNode): void {
   if (!child.visible || child.layoutPositioning === 'ABSOLUTE') return
 
+  // Геометрию из файла уважаем только у абсолютно позиционированных: у
+  // элементов в потоке позицию определяет раскладка. Иначе смена порядка
+  // оставляла бы старые координаты, и элементы накладывались бы друг на друга.
+  const isInFlow = child.layoutPositioning !== 'ABSOLUTE'
   const preservesImportedFrameGeometry =
+    !isInFlow &&
     child.source.format === 'fig' &&
     frameSourceIsFig(graph, child.parentId) &&
     (child.type === 'FRAME' || child.type === 'LINE')
   const preservesImportedPosition =
     preservesImportedFrameGeometry ||
-    (child.source.format === 'fig' && Math.abs(child.rotation) > 0.001)
+    (!isInFlow && child.source.format === 'fig' && Math.abs(child.rotation) > 0.001)
   graph.updateNode(child.id, {
     x: computedChildPosition(child, yogaChild, 'x', preservesImportedPosition),
     y: computedChildPosition(child, yogaChild, 'y', preservesImportedPosition),
