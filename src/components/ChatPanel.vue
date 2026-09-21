@@ -111,6 +111,32 @@ watchEffect(() => {
   setAssistantBusy(status.value === 'submitted' || status.value === 'streaming')
 })
 onScopeDispose(() => setAssistantBusy(false))
+
+/**
+ * Не даём браузеру усыпить вкладку, пока ассистент работает.
+ *
+ * Шаги ассистента идут через сеть, и в фоновой вкладке браузер режет
+ * таймеры: работа встаёт и дожидается возвращения на вкладку. Экранная
+ * блокировка удерживает вкладку активной, пока идёт работа.
+ */
+let wakeLock: { release: () => Promise<void> } | null = null
+watchEffect(async () => {
+  const busy = status.value === 'submitted' || status.value === 'streaming'
+  if (busy && !wakeLock) {
+    try {
+      wakeLock = (await navigator.wakeLock?.request('screen')) ?? null
+    } catch {
+      wakeLock = null
+    }
+  } else if (!busy && wakeLock) {
+    void wakeLock.release().catch(() => undefined)
+    wakeLock = null
+  }
+})
+onScopeDispose(() => {
+  void wakeLock?.release().catch(() => undefined)
+  wakeLock = null
+})
 const showContinue = computed(() => {
   if (history.readOnly.value || agentHistoryReadOnly.value) return false
   if (status.value !== 'ready') return false
