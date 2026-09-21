@@ -3,6 +3,7 @@ import { useElementVisibility, useObjectUrl } from '@vueuse/core'
 import { computed, shallowRef, useTemplateRef, watch } from 'vue'
 
 import { useEditorStore } from '@/app/editor/active-store'
+import { withThumbnailSlot } from '@/app/document/export/thumbnail-queue'
 import { findAssetPage } from '@/components/assets-panel/page'
 import { ASSET_GRID_THUMBNAIL_SIZE, ASSET_THUMBNAIL_RENDER_SCALE } from '@/constants'
 
@@ -31,11 +32,15 @@ async function updatePreview() {
   const maxDimension = Math.max(node.width, node.height, 1)
   const scale = (size * ASSET_THUMBNAIL_RENDER_SCALE) / maxDimension
   try {
-    const data = await editor.renderExportImage(
-      [nodeId],
-      scale,
-      'PNG',
-      findAssetPage(node, editor.graph)?.id ?? editor.state.currentPageId
+    // Через очередь: иначе сотни превью рендерятся одновременно и мешают
+    // друг другу — из-за этого они появлялись по одному и медленно.
+    const data = await withThumbnailSlot(() =>
+      editor.renderExportImage(
+        [nodeId],
+        scale,
+        'PNG',
+        findAssetPage(node, editor.graph)?.id ?? editor.state.currentPageId
+      )
     )
     if (currentRequest !== requestId) return
     previewBlob.value = data ? new Blob([data], { type: 'image/png' }) : null
