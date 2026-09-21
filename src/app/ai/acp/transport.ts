@@ -10,7 +10,7 @@ import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai'
 
 import type { ACPAgentDef } from '@open-pencil/core/constants'
 
-import SYSTEM_PROMPT from '@/app/ai/chat/system-prompt'
+import { activeSystemPrompt } from '@/app/ai/chat/prompt-settings'
 import { describeDiagnosticError, recordACPTransportFailure } from '@/app/diagnostics'
 import { buildACPMCPServers } from '@/app/integrations/mcp'
 
@@ -111,7 +111,7 @@ export class ACPChatTransport implements ChatTransport<UIMessage> {
       this.sentContext = false
     }
 
-    const promptText = this.sentContext ? text : `${SYSTEM_PROMPT}\n\n${text}`
+    const promptText = this.sentContext ? text : `${activeSystemPrompt()}\n\n${text}`
     this.sentContext = true
 
     const { connection, sessionId } = this.session

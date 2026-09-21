@@ -10,7 +10,7 @@ import type { ACPAgentID, AIProviderID } from '@open-pencil/core/constants'
 import { classifyAIChatError, type AIChatFailure } from '@/app/ai/chat/failure'
 import { resolveLanguageModelID } from '@/app/ai/chat/model'
 import { buildReasoningProviderOptions, type AIProviderOptions } from '@/app/ai/chat/reasoning'
-import SYSTEM_PROMPT from '@/app/ai/chat/system-prompt'
+import { activeSystemPrompt } from '@/app/ai/chat/prompt-settings'
 import { createAIModelRuntime, resolveModelConnectionAPIKey } from '@/app/ai/models'
 import { createAITools, recordStep, resetRunSteps } from '@/app/ai/tools'
 import { enabledAIToolDefinitions } from '@/app/ai/tools/catalog'
@@ -99,7 +99,7 @@ export function createToolLoopTransport({
 
   const agent = new ToolLoopAgent({
     model,
-    instructions: SYSTEM_PROMPT,
+    instructions: activeSystemPrompt(),
     tools,
     maxOutputTokens,
     providerOptions,
@@ -235,7 +235,7 @@ export function createChatSessionManager({
           thinkingLevel: runtime.role.profile.harnessThinkingLevel ?? 'medium',
           permissionMode: runtime.role.profile.harnessPermissionMode ?? 'allow-edits'
         },
-        instructions: SYSTEM_PROMPT,
+        instructions: activeSystemPrompt(),
         mcpServers: await buildPiMCPServers()
       },
       { OPENPENCIL_HARNESS_API_KEY: apiKey }

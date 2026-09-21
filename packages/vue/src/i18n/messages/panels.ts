@@ -12,6 +12,12 @@ export const panelMessageDefaults = {
   code: 'Code',
   ai: 'AI',
   rules: 'Rules',
+  assistantPrompt: 'Assistant behaviour',
+  assistantPromptHint:
+    'Rules the assistant follows in chat: how it works and what it aims for. Edit to suit your team; reset returns the built-in text.',
+  promptCustomized: 'Edited',
+  resetToDefault: 'Reset to default',
+  saved: 'Saved',
   rulesDescription:
     'When to use this component, when not to, what may be changed and what must stay as is.',
   rulesEmpty: 'No rules yet. They will appear here.',
