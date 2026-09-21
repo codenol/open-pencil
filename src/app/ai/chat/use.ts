@@ -33,7 +33,7 @@ import {
   setRememberCredentials
 } from '@/app/settings/credentials/media'
 
-const activeTab = ref<'design' | 'code' | 'ai'>('design')
+const activeTab = ref<'design' | 'code' | 'ai' | 'rules'>('design')
 
 const chatSession = createChatSessionManager({
   isConfigured,
