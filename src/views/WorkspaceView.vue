@@ -148,6 +148,29 @@ async function bindAssociatedFileOpen(): Promise<void> {
 
 let stopWebMCP: (() => void) | undefined
 
+/**
+ * Открывает файл, если в адресе есть его идентификатор. Библиотека — тот же
+ * файл, просто помеченный, поэтому открывается и правится как обычный канвас.
+ */
+async function openDocumentFromRoute(): Promise<void> {
+  const documentId = route.params.documentId
+  if (typeof documentId !== 'string' || !documentId) return
+  try {
+    const { createActiveStorageAdapter, activeStorageProviderID } = await import(
+      '@/app/integrations/storage'
+    )
+    const { openStorageDocumentInNewTab } = await import('@/app/tabs')
+    const providerId = activeStorageProviderID.value
+    const adapter = createActiveStorageAdapter(providerId)
+    const documents = await adapter.listDocuments()
+    const document = documents.find((entry) => entry.id === documentId)
+    if (!document) return
+    await openStorageDocumentInNewTab(document)
+  } catch (error) {
+    console.error('[Files] не удалось открыть файл по адресу:', error)
+  }
+}
+
 onMounted(async () => {
   stopWebMCP = startWebMCP(getActiveStore)
   await startMCPRuntime(getActiveStore)
@@ -157,6 +180,10 @@ onMounted(async () => {
   } catch (error) {
     reportOpenFailure(error)
   }
+
+  // У каждого файла свой адрес: /files/design/<id> или /files/library/<id>.
+  // По ссылке открывается тот же файл — им можно поделиться.
+  await openDocumentFromRoute()
 
   // The browser twin of the deep link: the desktop build takes its links through the
   // deep-link plugin above, so only a real browser reads them off the address bar.

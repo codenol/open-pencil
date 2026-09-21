@@ -24,7 +24,8 @@ import { notificationMessages } from '@/app/i18n/notifications'
 import {
   activeStorageProviderID,
   createActiveStorageAdapter,
-  type StorageDocument
+  type StorageDocument,
+  type StorageDocumentKind
 } from '@/app/integrations/storage'
 import {
   cacheRecentFileThumbnail,
@@ -326,11 +327,30 @@ function failPreparation(
   })
 }
 
+/**
+ * Адрес файла в хранилище. Тип виден из пути: /files/design/… или
+ * /files/library/…. Идентификатор — тот же, что в хранилище, поэтому
+ * ссылку можно переслать и она откроет тот же файл.
+ */
+export function storageDocumentPath(id: string, kind: StorageDocumentKind = 'design'): string {
+  const segment = kind === 'library' ? 'library' : 'design'
+  return `/files/${segment}/${encodeURIComponent(id)}`
+}
+
+/** Ставит адрес файла в строку браузера, не перезагружая приложение. */
+function syncDocumentRoute(id: string, kind: StorageDocumentKind = 'design'): void {
+  if (typeof window === 'undefined') return
+  const target = storageDocumentPath(id, kind)
+  if (window.location.pathname === target) return
+  window.history.pushState(null, '', target)
+}
+
 export async function openStorageDocumentInNewTab(document: StorageDocument): Promise<void> {
   const providerId = activeStorageProviderID.value
   const existing = findStorageTab(providerId, document.id)
   if (existing) {
     switchTab(existing.id)
+    syncDocumentRoute(document.id, document.kind)
     rememberRecentStorageDocument(providerId, document.id, document.name)
     return
   }
@@ -392,6 +412,7 @@ export async function openStorageDocumentInNewTab(document: StorageDocument): Pr
       load
     )
     rememberRecentStorageDocument(providerId, document.id, document.name)
+    syncDocumentRoute(document.id, document.kind)
     succeeded = true
   } catch (error) {
     if (!load.signal.aborted) {

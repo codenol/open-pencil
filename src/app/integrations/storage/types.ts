@@ -13,9 +13,16 @@ export type StorageTransferProgress = {
   totalBytes: number | null
 }
 
+/**
+ * Тип файла в хранилище. Из него строится адрес: макеты — /files/design/…,
+ * библиотеки — /files/library/…
+ */
+export type StorageDocumentKind = 'design' | 'library'
+
 export type StorageDocumentMetadata = {
   name: string
   updatedAt: string
+  kind?: StorageDocumentKind
 }
 
 export type StorageDocument = StorageDocumentMetadata & {
@@ -79,6 +86,11 @@ export interface StorageAdapter {
   ): Promise<void>
   deleteDocument(id: string): Promise<void>
   getDocumentMetadata?(id: string): Promise<StorageDocumentMetadata | null>
+  /**
+   * Смена типа файла: макет ↔ библиотека. Библиотека — тот же файл, просто
+   * помеченный, поэтому её по-прежнему можно открыть и править как канвас.
+   */
+  setDocumentKind?(id: string, kind: StorageDocumentKind): Promise<void>
   getUsage(): Promise<StorageUsage>
   getThumbnail?(id: string): Promise<Uint8Array | null>
   putThumbnail?(id: string, bytes: Uint8Array): Promise<void>

@@ -48,6 +48,7 @@ export function createNorkaStorageAdapter(runtime: StorageProviderRuntime): Stor
         documents: Array<{
           id: string
           name: string
+          kind?: string
           updatedAt: string | null
           hasThumbnail?: boolean
         }>
@@ -55,6 +56,7 @@ export function createNorkaStorageAdapter(runtime: StorageProviderRuntime): Stor
       return data.documents.map((doc) => ({
         id: doc.id,
         name: doc.name,
+        kind: doc.kind === 'library' ? 'library' : 'design',
         updatedAt: doc.updatedAt ?? new Date(0).toISOString(),
         thumbnailURL: doc.hasThumbnail ? api(`/documents/${encodeURIComponent(doc.id)}/thumbnail`) : null,
         metadataAuthoritative: true
@@ -72,12 +74,14 @@ export function createNorkaStorageAdapter(runtime: StorageProviderRuntime): Stor
     },
 
     async putDocument(id, bytes, metadata: StorageDocumentMetadata, onProgress) {
+      const headers: Record<string, string> = {
+        'content-type': 'application/octet-stream',
+        'x-document-name': encodeURIComponent(metadata.name)
+      }
+      if (metadata.kind) headers['x-document-kind'] = metadata.kind
       const res = await request(api(`/documents/${encodeURIComponent(id)}`), {
         method: 'PUT',
-        headers: {
-          'content-type': 'application/octet-stream',
-          'x-document-name': encodeURIComponent(metadata.name)
-        },
+        headers,
         body: bytes
       })
       if (!res.ok) throw new Error(`Не удалось сохранить файл: ${res.status}`)
@@ -92,8 +96,22 @@ export function createNorkaStorageAdapter(runtime: StorageProviderRuntime): Stor
     async getDocumentMetadata(id) {
       const res = await request(api(`/documents/${encodeURIComponent(id)}/metadata`))
       if (!res.ok) return null
-      const data = (await res.json()) as { name: string; updatedAt: string }
-      return { name: data.name, updatedAt: data.updatedAt }
+      const data = (await res.json()) as { name: string; kind?: string; updatedAt: string }
+      return {
+        name: data.name,
+        kind: data.kind === 'library' ? 'library' : 'design',
+        updatedAt: data.updatedAt
+      }
+    },
+
+    /** Меняет тип файла: макет ↔ библиотека. От этого зависит адрес. */
+    async setDocumentKind(id, kind) {
+      const res = await request(api(`/documents/${encodeURIComponent(id)}/metadata`), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind })
+      })
+      if (!res.ok) throw new Error(`Не удалось сменить тип файла: ${res.status}`)
     },
 
     async getUsage() {

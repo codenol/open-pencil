@@ -22,6 +22,7 @@ export type {
   StorageCredentialField,
   StorageDocument,
   StorageDocumentBinding,
+  StorageDocumentKind,
   StorageDocumentMetadata,
   StorageFieldID,
   LibraryObjectStore,
