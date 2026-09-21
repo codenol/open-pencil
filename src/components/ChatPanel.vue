@@ -115,28 +115,36 @@ onScopeDispose(() => setAssistantBusy(false))
 /**
  * Не даём браузеру усыпить вкладку, пока ассистент работает.
  *
- * Шаги ассистента идут через сеть, и в фоновой вкладке браузер режет
- * таймеры: работа встаёт и дожидается возвращения на вкладку. Экранная
- * блокировка удерживает вкладку активной, пока идёт работа.
+ * Шаги идут через сеть, и в фоновой вкладке браузер режет таймеры: работа
+ * встаёт до возвращения на вкладку. Экранная блокировка удерживает вкладку
+ * активной. Запрашиваем только на переходе «начал работать», иначе браузер
+ * получает запросы на каждое изменение состояния.
  */
 let wakeLock: { release: () => Promise<void> } | null = null
-watchEffect(async () => {
-  const busy = status.value === 'submitted' || status.value === 'streaming'
-  if (busy && !wakeLock) {
-    try {
-      wakeLock = (await navigator.wakeLock?.request('screen')) ?? null
-    } catch {
+
+function acquireWakeLock(): void {
+  if (wakeLock || !navigator.wakeLock) return
+  navigator.wakeLock
+    .request('screen')
+    .then((lock) => {
+      wakeLock = lock
+    })
+    .catch(() => {
       wakeLock = null
-    }
-  } else if (!busy && wakeLock) {
-    void wakeLock.release().catch(() => undefined)
-    wakeLock = null
-  }
-})
-onScopeDispose(() => {
-  void wakeLock?.release().catch(() => undefined)
+    })
+}
+
+function releaseWakeLock(): void {
+  const lock = wakeLock
   wakeLock = null
-})
+  void lock?.release().catch(() => undefined)
+}
+
+watch(
+  () => status.value === 'submitted' || status.value === 'streaming',
+  (busy) => (busy ? acquireWakeLock() : releaseWakeLock())
+)
+onScopeDispose(releaseWakeLock)
 const showContinue = computed(() => {
   if (history.readOnly.value || agentHistoryReadOnly.value) return false
   if (status.value !== 'ready') return false
@@ -180,6 +188,9 @@ watch(
 )
 
 function handleStop() {
+  // Останавливаем сразу, до всякой другой работы: пока поток занят
+  // пересчётом, обработчик может не дойти, а остановка нужна немедленно.
+  void chat.value?.stop().catch(() => undefined)
   submission.stop()
 }
 </script>

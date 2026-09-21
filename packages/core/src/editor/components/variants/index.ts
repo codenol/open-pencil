@@ -538,7 +538,23 @@ export function createVariantActions(ctx: EditorContext) {
     return getComponentSetVariants(componentSetId).sort(sortByCanvasPosition)[0]
   }
 
+  /**
+   * Конфликты имён вариантов: у сета не должно быть двух вариантов с одним
+   * набором значений.
+   *
+   * Проверка тяжёлая: перебирает все варианты сета и по каждому собирает
+   * ключ из всех свойств. У `button` это 900 вариантов × 5 свойств, и таких
+   * сетоов десятки — при каждой отрисовке панели это тысячи операций и
+   * подвисание. Поэтому результат запоминаем и сбрасываем при изменении
+   * документа, а не считаем заново на каждый вызов.
+   */
+  const conflictCache = new Map<string, { version: number; conflicts: VariantConflict[] }>()
+
   function getComponentSetVariantConflicts(componentSetId: string): VariantConflict[] {
+    const version = ctx.state.sceneVersion
+    const cached = conflictCache.get(componentSetId)
+    if (cached && cached.version === version) return cached.conflicts
+
     const definitions = getVariantDefinitions(componentSetId)
     const byKey = new Map<string, VariantConflict>()
     for (const variant of getComponentSetVariants(componentSetId)) {
@@ -550,7 +566,9 @@ export function createVariantActions(ctx: EditorContext) {
       entry.componentIds.push(variant.id)
       byKey.set(key, entry)
     }
-    return [...byKey.values()].filter((entry) => entry.componentIds.length > 1)
+    const conflicts = [...byKey.values()].filter((entry) => entry.componentIds.length > 1)
+    conflictCache.set(componentSetId, { version, conflicts })
+    return conflicts
   }
 
   function validateComponentSet(componentSetId: string): VariantValidationIssue[] {
