@@ -29,7 +29,9 @@ function createNewTab(event: MouseEvent): void {
 }
 
 function onMiddleClick(e: MouseEvent, tabId: string, isHome: boolean) {
-  if (e.button === 1 && (!isHome || tabs.value.length > 1)) {
+  // Домашний таб («Файлы») закреплён — средний клик его не закрывает.
+  if (isHome) return
+  if (e.button === 1) {
     e.preventDefault()
     void closeTab(tabId)
   }
@@ -66,21 +68,21 @@ function onClose(e: MouseEvent, tabId: string) {
           <icon-lucide-house v-if="tab.isHome" :class="baseStyles.icon()" />
           <PreparationIndicator v-else-if="tab.isPreparing" :progress="tab.preparationProgress" />
           <icon-lucide-file v-else :class="baseStyles.icon()" />
-          <span :class="baseStyles.label()">{{ tab.isHome ? files.newTab : tab.name }}</span>
+          <span :class="baseStyles.label()">{{ tab.isHome ? files.filesTab : tab.name }}</span>
           <Tip v-if="tab.isDirty" :label="files.unsavedChanges">
             <span role="img" :aria-label="files.unsavedChanges" :class="baseStyles.dirtyDot()" />
           </Tip>
         </TabsTrigger>
         <Tip
-          v-if="!tab.isHome || tabs.length > 1"
-          :label="files.closeTab({ name: tab.isHome ? files.newTab : tab.name })"
+          v-if="!tab.isHome"
+          :label="files.closeTab({ name: tab.name })"
         >
           <button
             type="button"
             data-test-id="tabbar-close"
             :class="tabBarStyles({ active: tab.isActive }).close()"
             :data-active="tab.isActive || undefined"
-            :aria-label="files.closeTab({ name: tab.isHome ? files.newTab : tab.name })"
+            :aria-label="files.closeTab({ name: tab.name })"
             tabindex="-1"
             @click="onClose($event, tab.id)"
           >

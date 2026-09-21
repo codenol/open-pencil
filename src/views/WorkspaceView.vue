@@ -41,13 +41,19 @@ import { IS_BROWSER } from '@/constants'
 const route = useRoute()
 const router = useRouter()
 const createdInitialTab = tabCount() === 0
+// Список файлов — точка входа, и его таб закреплён. Поэтому домашний таб
+// создаётся всегда: и на корне, и на /files. Исключение только тестовые
+// сборки и демо-страница, где нужен сразу холст.
 const shouldCreateHome =
-  route.path === '/' &&
+  (route.path === '/' || route.path === '/files') &&
   !appRuntimeConfig.test &&
-  !route.meta.demo &&
-  (isTauri() || appRuntimeConfig.recentFiles)
+  !route.meta.demo
 let firstTab = activeTab.value
 if (!firstTab) firstTab = shouldCreateHome ? createHomeTab() : createTab()
+// Адрес должен совпадать с открытым табом: список файлов живёт на /files.
+if (createdInitialTab && firstTab.kind === 'home' && route.path !== '/files') {
+  void router.replace('/files')
+}
 
 if (createdInitialTab && route.meta.demo && !appRuntimeConfig.test) {
   void createDemoShapes(firstTab.store)
