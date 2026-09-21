@@ -11,6 +11,10 @@ export const panelMessageDefaults = {
   design: 'Design',
   code: 'Code',
   ai: 'AI',
+  rules: 'Rules',
+  rulesDescription:
+    'When to use this component, when not to, what may be changed and what must stay as is.',
+  rulesEmpty: 'No rules yet. They will appear here.',
   assets: 'Assets',
   searchLocalComponents: 'Search local components',
   assetView: 'Asset view',
