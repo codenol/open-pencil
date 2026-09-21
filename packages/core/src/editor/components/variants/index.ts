@@ -464,15 +464,22 @@ export function createVariantActions(ctx: EditorContext) {
     return { kind: 'changed' }
   }
 
+  /**
+   * Значения, которые можно выбрать у сета.
+   *
+   * Свойства без значений (слоты — объявлены вариантами, но ни один вариант
+   * по ним не различается) в список не попадают: выбирать там нечего, а в
+   * панели они выглядели как пустые селекты.
+   */
   function collectVariantOptions(componentSetId: string): Map<string, Set<string>> {
     const options = new Map<string, Set<string>>()
-    for (const definition of getVariantDefinitions(componentSetId)) {
-      options.set(definition.name, new Set())
-    }
     for (const variant of getComponentSetVariants(componentSetId)) {
       for (const definition of getVariantDefinitions(componentSetId)) {
-        const value = variant.componentPropertyValues[definition.name]
-        if (value) options.get(definition.name)?.add(value)
+        const value = variant.componentPropertyValues?.[definition.name]
+        if (!value) continue
+        const bucket = options.get(definition.name) ?? new Set<string>()
+        bucket.add(value)
+        options.set(definition.name, bucket)
       }
     }
     return options
@@ -500,17 +507,30 @@ export function createVariantActions(ctx: EditorContext) {
       )
   }
 
+  /**
+   * Вариант, точно совпадающий по переданным значениям.
+   *
+   * Свойства, по которым ни один вариант не различается (у сети бывают такие:
+   * объявлены как варианты, но значения пустые — по сути это слоты), в поиске
+   * не участвуют. Иначе подходящего варианта не находится и выбор блокируется.
+   */
   function findExactVariant(
     componentSetId: string,
     values: Record<string, string>
   ): SceneNode | undefined {
+    const variants = getComponentSetVariants(componentSetId)
     const definitions = getVariantDefinitions(componentSetId)
-    if (definitions.some((definition) => !Object.hasOwn(values, definition.name))) return undefined
+    const meaningful = definitions.filter((definition) => {
+      // Свойство различает варианты только если у кого-то значение непустое.
+      return variants.some((variant) => {
+        const value = variant.componentPropertyValues?.[definition.name]
+        return value !== undefined && value !== ''
+      })
+    })
+    if (meaningful.some((definition) => !Object.hasOwn(values, definition.name))) return undefined
     return findVariantByValues(
       componentSetId,
-      Object.fromEntries(
-        definitions.map((definition) => [definition.name, values[definition.name]])
-      )
+      Object.fromEntries(meaningful.map((definition) => [definition.name, values[definition.name]]))
     )
   }
 
@@ -569,14 +589,10 @@ export function createVariantActions(ctx: EditorContext) {
       return []
     }
     const options = collectVariantOptions(componentSetId).get(propertyName) ?? new Set<string>()
+    const base = variantValues(componentSetId, component)
     return [...options].map((value) => ({
       value,
-      available: Boolean(
-        findExactVariant(componentSetId, {
-          ...variantValues(componentSetId, component),
-          [propertyName]: value
-        })
-      )
+      available: Boolean(findExactVariant(componentSetId, { ...base, [propertyName]: value }))
     }))
   }
 
