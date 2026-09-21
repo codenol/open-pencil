@@ -3,6 +3,7 @@ import * as v from 'valibot'
 import { getComponentCatalog } from '#core/tools/component-catalog'
 import { toolNumber } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
+import { readComponentRules } from '#core/tools/component-rules'
 
 export const listLibraries = defineTool({
   name: 'list_libraries',
@@ -49,7 +50,7 @@ export const insertLibraryComponent = defineTool({
       }
       variantValues = Object.fromEntries(entries) as Record<string, string>
     }
-    return catalog.insertComponent({
+    const inserted = await catalog.insertComponent({
       libraryId: args.library_id,
       revisionId: args.revision_id,
       assetKey: args.asset_key,
@@ -58,5 +59,9 @@ export const insertLibraryComponent = defineTool({
       y: args.y,
       variantValues
     })
+
+    // Правила приходят в момент вставки — ровно тогда, когда их можно нарушить.
+    const rules = readComponentRules(figma.graph, inserted.componentId)
+    return rules ? { ...inserted, rules } : inserted
   }
 })

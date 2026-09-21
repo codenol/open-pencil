@@ -4,12 +4,50 @@ import { getComponentCatalog } from '#core/tools/component-catalog'
 import { toolNumber } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
 
+/**
+ * Правила компонента, поднятые из pluginData. Краткая форма идёт в поиск:
+ * одна строка про назначение и ключевой запрет. Полная — при вставке.
+ */
+interface ComponentRulesSummary {
+  purpose: string
+  mustNot: string
+}
+
+const RULES_PLUGIN_ID = 'norka.design-system'
+
+/** Минимум, который нужен от узла, чтобы достать правила. */
+interface ComponentRulesHolder {
+  pluginData?: readonly { pluginId: string; key: string; value: string }[]
+}
+const RULES_KEY = 'component-rules'
+
+/** Краткая выжимка правил: назначение и первый запрет — самое важное. */
+function summarizeRules(node: ComponentRulesHolder | undefined): ComponentRulesSummary | null {
+  const entry = node?.pluginData?.find(
+    (item) => item.pluginId === RULES_PLUGIN_ID && item.key === RULES_KEY
+  )
+  if (!entry) return null
+  try {
+    const parsed = JSON.parse(entry.value) as { purpose?: unknown; forbidden?: unknown }
+    const purpose = typeof parsed.purpose === 'string' ? parsed.purpose : ''
+    const forbidden = Array.isArray(parsed.forbidden)
+      ? parsed.forbidden.filter((item): item is string => typeof item === 'string')
+      : []
+    if (!purpose && forbidden.length === 0) return null
+    return { purpose, mustNot: forbidden[0] ?? '' }
+  } catch {
+    return null
+  }
+}
+
 interface DocumentComponentResult {
   id: string
   name: string
   type: string
   page: string
   source: 'document'
+  /** Правила компонента — ассистент обязан их соблюдать. */
+  rules?: ComponentRulesSummary
 }
 
 interface LibraryComponentResult {
@@ -28,7 +66,7 @@ interface LibraryComponentResult {
 export const getComponents = defineTool({
   name: 'get_components',
   description:
-    'List reusable components from the document and enabled component libraries, optionally filtered by name.',
+    'List reusable components from the document and enabled component libraries, optionally filtered by name. Components may carry rules (purpose, mustNot) — obey them when using the component.',
   execution: { kind: 'async', mutation: 'none' },
   input: v.object({
     name: v.optional(
@@ -60,12 +98,14 @@ export const getComponents = defineTool({
           if (documentComponents.length >= limit) return false
           if (node.type !== 'COMPONENT' && node.type !== 'COMPONENT_SET') return false
           if (nameFilter && !node.name.toLowerCase().includes(nameFilter)) return false
+          const rules = summarizeRules(figma.graph.getNode(node.id))
           documentComponents.push({
             id: node.id,
             name: node.name,
             type: node.type,
             page: page.name,
-            source: 'document'
+            source: 'document',
+            ...(rules ? { rules } : {})
           })
           return false
         })
