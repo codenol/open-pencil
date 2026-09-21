@@ -32,3 +32,4 @@ export {
 } from './analyze/overlaps/params'
 export { setPexelsAPIKey, setUnsplashAccessKey } from './stock-photo'
 export { importSVG } from './create'
+export { resolveDefaultVariant, markDefaultVariant } from './default-variant'

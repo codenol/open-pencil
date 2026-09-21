@@ -16,6 +16,7 @@ import { createDefaultNode } from '@open-pencil/scene-graph/node-defaults'
 import { useI18n } from '@open-pencil/vue'
 
 import { useEditorStore } from '@/app/editor/active-store'
+import { resolveDefaultVariant } from '@open-pencil/core/tools'
 import { nodeIcon } from '@/app/editor/icons'
 import { useLibraryService } from '@/app/libraries'
 import { openExternalLink } from '@/app/shell/ui'
@@ -281,8 +282,11 @@ async function resolveAssetComponent(asset: LocalAsset): Promise<string | null> 
 }
 
 async function insertAsset(asset: LocalAsset) {
-  const componentId = await resolveAssetComponent(asset)
-  if (!componentId) return
+  const resolvedId = await resolveAssetComponent(asset)
+  if (!resolvedId) return
+  // У сета десятки вариантов; вставляем базовый, а не первый попавшийся.
+  // Если у компонента базовый не помечен — берём выведенный по имени.
+  const componentId = resolveDefaultVariant(editor.graph, resolvedId)?.variantId ?? resolvedId
   const component = editor.graph.getNode(componentId)
   if (!component) return
   const parentId = editor.state.enteredContainerId ?? editor.state.currentPageId
