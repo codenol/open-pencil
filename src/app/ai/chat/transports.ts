@@ -10,6 +10,7 @@ import type { ACPAgentID, AIProviderID } from '@open-pencil/core/constants'
 import { classifyAIChatError, type AIChatFailure } from '@/app/ai/chat/failure'
 import { resolveLanguageModelID } from '@/app/ai/chat/model'
 import { buildReasoningProviderOptions, type AIProviderOptions } from '@/app/ai/chat/reasoning'
+import { compressStepHistory, KEEP_FULL_MESSAGES } from '@/app/ai/chat/compress-history'
 import { activeSystemPrompt } from '@/app/ai/chat/prompt-settings'
 import { createAIModelRuntime, resolveModelConnectionAPIKey } from '@/app/ai/models'
 import { createAITools, recordStep, resetRunSteps } from '@/app/ai/tools'
@@ -117,6 +118,19 @@ export function createToolLoopTransport({
         maxOutputTokens,
         providerOptions
       }
+    },
+    /**
+     * Перед каждым шагом подрезаем историю.
+     *
+     * Ответы инструментов бывают большими (разбор узла, справка по рендеру),
+     * а шагов до пятидесяти. Без подрезки запрос растёт с каждым шагом и на
+     * середине задачи становится таким, что браузер не справляется — работа
+     * встаёт намертво. Оставляем свежие шаги целиком, старые — только имена
+     * вызовов и короткие итоги.
+     */
+    prepareStep: ({ steps, messages }) => {
+      const compressed = compressStepHistory(messages, steps.length * 2 - KEEP_FULL_MESSAGES)
+      return compressed === messages ? undefined : { messages: compressed }
     },
     onStepFinish: ({ usage }) => {
       recordStep(store)
