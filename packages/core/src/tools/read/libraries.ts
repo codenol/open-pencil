@@ -4,6 +4,7 @@ import { getComponentCatalog } from '#core/tools/component-catalog'
 import { toolNumber } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
 import { readComponentRules } from '#core/tools/component-rules'
+import { resolveDefaultVariant } from '#core/tools/default-variant'
 
 export const listLibraries = defineTool({
   name: 'list_libraries',
@@ -15,6 +16,28 @@ export const listLibraries = defineTool({
     const catalog = getComponentCatalog(figma.graph)
     const libraries = catalog ? await catalog.listLibraries() : []
     return { count: libraries.length, libraries }
+  }
+})
+
+export const getDefaultVariant = defineTool({
+  name: 'get_default_variant',
+  description:
+    'Resolve the variant to use by default for a component set. Call this before inserting a component that has many variants — do not pick one at random.',
+  execution: { kind: 'sync', mutation: 'none' },
+  exposure: { webmcp: false },
+  input: v.object({
+    id: v.pipe(v.string(), v.description('Component or component set node ID'))
+  }),
+  execute: (figma, args) => {
+    const resolved = resolveDefaultVariant(figma.graph, args.id)
+    if (!resolved) return { found: false }
+    return {
+      found: true,
+      variantId: resolved.variantId,
+      variantName: resolved.variantName,
+      // «marked» — помечено в системе, «guessed» — выведено по имени.
+      source: resolved.source
+    }
   }
 })
 
