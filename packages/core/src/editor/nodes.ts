@@ -1,5 +1,7 @@
 import { pick } from 'es-toolkit/object'
 
+import { releaseOriginalFigArchive } from '#core/kiwi/fig/session/original-archive'
+
 import { styleDetachmentChanges, type SceneNode } from '@open-pencil/scene-graph'
 
 import { createLayoutModeActions } from './layout-mode'
@@ -15,7 +17,7 @@ export function opacityFromBuffer(buffer: string): number {
   if (!/^\d+$/.test(buffer)) return 1
   const n = Number.parseInt(buffer, 10)
   if (!Number.isFinite(n)) return 1
-  const percent = buffer.length === 1 ? n * 10 : n
+const percent = buffer.length === 1 ? n * 10 : n
   return Math.min(100, Math.max(0, percent)) / 100
 }
 
@@ -24,9 +26,23 @@ export function createNodeActions(ctx: EditorContext) {
   const nudgeActions = createNudgeActions(ctx)
   const variableBindingActions = createVariableBindingActions(ctx)
 
+  /**
+   * Изменение документа отменяет исходный архив файла.
+   *
+   * Пока документ открыт, рядом с ним лежит его исходный архив: пока правок
+   * не было, сохранение отдаёт архив как есть — так файл переживает открытие
+   * без потерь. Но как только документ меняется, отдавать исходный архив
+   * нельзя: вместе с ним на сервер ушёл бы старый документ, и правки
+   * пропадали бы после перезагрузки. Дешёвый вызов, можно звать на каждую правку.
+   */
+  function invalidateOriginalArchive() {
+    releaseOriginalFigArchive(ctx.graph)
+  }
+
   function updateNode(id: string, changes: Partial<SceneNode>) {
     const node = ctx.graph.getNode(id)
     if (!node) return
+    invalidateOriginalArchive()
     // Path-edit last so its reflowed glyphs win over auto-resize's glyph clear
     // (path text is textAutoResize NONE so they don't collide today).
     const nextChanges = styleDetachmentChanges(node, {
@@ -41,6 +57,7 @@ export function createNodeActions(ctx: EditorContext) {
   function updateNodeWithUndo(id: string, changes: Partial<SceneNode>, label = 'Update') {
     const node = ctx.graph.getNode(id)
     if (!node) return
+    invalidateOriginalArchive()
     // Same ordering rationale as updateNode: reflowed path-text glyphs win.
     const nextChanges = styleDetachmentChanges(node, {
       ...changes,
