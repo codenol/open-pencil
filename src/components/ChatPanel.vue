@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { Chat } from '@ai-sdk/vue'
 import type { UIMessage } from 'ai'
-import { computed, shallowRef, watch } from 'vue'
+import { computed, onScopeDispose, shallowRef, watch, watchEffect } from 'vue'
 
 import { useI18n } from '@open-pencil/vue'
 
 import { chatDocumentId } from '@/app/ai/chat/history/document'
+import { setAssistantBusy } from '@/app/ai/chat/busy'
 import { useChatSubmission } from '@/app/ai/chat/submission/use'
 import { useAIChat } from '@/app/ai/chat/use'
 import { didHitStepLimit } from '@/app/ai/tools'
@@ -104,6 +105,12 @@ const failureHasSettingsAction = computed(() =>
   ['authentication', 'forbidden', 'model-not-found'].includes(chatFailure.value?.reason ?? '')
 )
 const status = computed(() => chat.value?.status ?? 'ready')
+// Рабочая область гасится, пока ассистент занят: он работает с тем же
+// документом, и правки руками в этот момент расходятся с его картиной.
+watchEffect(() => {
+  setAssistantBusy(status.value === 'submitted' || status.value === 'streaming')
+})
+onScopeDispose(() => setAssistantBusy(false))
 const showContinue = computed(() => {
   if (history.readOnly.value || agentHistoryReadOnly.value) return false
   if (status.value !== 'ready') return false

@@ -11,6 +11,7 @@ import { appMenuShortcut } from '@/app/shell/menu/shortcut'
 import { resolvedAppTheme } from '@/app/shell/theme'
 import { activeTab } from '@/app/tabs'
 import BrandMark from '@/components/brand/BrandMark.vue'
+import AssistantBusyOverlay from '@/components/editor/AssistantBusyOverlay.vue'
 import CanvasSplitRoot from '@/components/canvas/CanvasSplitRoot.vue'
 import CollabPanel from '@/components/CollabPanel/CollabPanel.vue'
 import EditorCanvas from '@/components/EditorCanvas.vue'
@@ -57,6 +58,7 @@ const horizontalSplitterStyles = tv(splitterTheme)({ direction: 'horizontal' })
       <div class="relative flex min-w-0 flex-1">
         <CanvasSplitRoot />
         <Toolbar />
+        <AssistantBusyOverlay />
       </div>
     </SplitterPanel>
     <SplitterResizeHandle :class="horizontalSplitterStyles.handle()">
@@ -85,6 +87,7 @@ const horizontalSplitterStyles = tv(splitterTheme)({ direction: 'horizontal' })
       <EditorCanvas />
       <MobileHud />
       <Toolbar />
+      <AssistantBusyOverlay />
     </div>
     <MobileDrawer />
   </div>
@@ -96,6 +99,7 @@ const horizontalSplitterStyles = tv(splitterTheme)({ direction: 'horizontal' })
   >
     <div class="relative flex min-w-0 flex-1">
       <EditorCanvas />
+      <AssistantBusyOverlay />
       <div
         v-if="!isMobile"
         class="absolute top-7 left-7 z-10 flex items-center gap-2 rounded-lg border border-border bg-panel px-2 py-1 shadow-sm"
@@ -119,6 +123,7 @@ const horizontalSplitterStyles = tv(splitterTheme)({ direction: 'horizontal' })
   <div v-else :key="'bare-' + activeTab?.id" class="flex flex-1 overflow-hidden">
     <div class="relative flex min-w-0 flex-1">
       <EditorCanvas />
+      <AssistantBusyOverlay />
     </div>
   </div>
 </template>
