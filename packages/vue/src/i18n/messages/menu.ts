@@ -9,10 +9,10 @@ export const menuMessageDefaults = {
   text: 'Text',
 
   new: 'New',
-  open: 'Open…',
-  openStorageWorkspace: 'Open storage workspace…',
+  open: 'Upload from computer…',
+  openStorageWorkspace: 'Files on server',
   save: 'Save',
-  saveAs: 'Save as…',
+  saveAs: 'Download to computer…',
   exportSelection: 'Export selection…',
   exportSelectionAsPNG: 'Export selection as PNG',
   exportSelectionAsSVG: 'Export selection as SVG',

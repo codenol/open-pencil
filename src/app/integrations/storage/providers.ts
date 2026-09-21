@@ -1,5 +1,27 @@
+import { createNorkaStorageAdapter } from './norka/adapter'
 import { defineStorageProvider, StorageProviderRegistry } from './registry'
 import { createS3StorageAdapter } from './s3/adapter'
+
+/**
+ * Хранилище норки: файлы лежат на том же сервере, где развёрнут редактор.
+ * Основной способ работы — открыть из списка и сохранять туда же. Обмен
+ * с локальным компьютером («загрузить с ПК» / «скачать») остаётся отдельно.
+ */
+export const NORKA_STORAGE_PROVIDER = defineStorageProvider({
+  id: 'norka-server',
+  label: 'Сервер норки',
+  description: 'Файлы на сервере рядом с редактором — открываются из списка и сохраняются туда же',
+  preferenceFields: [
+    {
+      id: 'endpoint',
+      label: 'Адрес сервиса',
+      kind: 'text',
+      placeholder: '/store'
+    }
+  ],
+  credentialFields: [],
+  createAdapter: createNorkaStorageAdapter
+})
 
 export const S3_STORAGE_PROVIDER = defineStorageProvider({
   id: 's3-compatible',
@@ -17,4 +39,7 @@ export const S3_STORAGE_PROVIDER = defineStorageProvider({
   createAdapter: createS3StorageAdapter
 })
 
-export const storageProviderRegistry = new StorageProviderRegistry([S3_STORAGE_PROVIDER])
+export const storageProviderRegistry = new StorageProviderRegistry([
+  NORKA_STORAGE_PROVIDER,
+  S3_STORAGE_PROVIDER
+])
