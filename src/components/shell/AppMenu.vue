@@ -37,6 +37,7 @@ import {
 } from '@/app/shell/menu/entry'
 import { appMenuShortcutLabel } from '@/app/shell/menu/shortcut'
 import { resolvedAppTheme } from '@/app/shell/theme'
+import { buildLabel } from '@/app/build-label'
 import BrandMark from '@/components/brand/BrandMark.vue'
 import IconButton from '@/components/ui/button/IconButton.vue'
 import AppShortcutText from '@/components/ui/menu/AppShortcutText.vue'
@@ -82,8 +83,9 @@ const subMenuCls = useMenuUI({ content: 'min-w-44' })
         v-else
         data-test-id="app-document-name"
         class="min-w-0 flex-1 cursor-default truncate rounded px-1 py-0.5 text-xs text-surface hover:bg-hover"
+        :title="store.state.documentName"
         @dblclick="startRename"
-        >{{ store.state.documentName }}</span
+        >{{ buildLabel }}<span class="ml-1.5 text-muted">· {{ store.state.documentName }}</span></span
       >
       <IconButton
         :label="settings.title"
