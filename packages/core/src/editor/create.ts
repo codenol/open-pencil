@@ -165,8 +165,6 @@ export function createEditor(options?: EditorOptions) {
   function setActiveTool(tool: EditorState['activeTool']) {
     const previous = state.activeTool
     state.activeTool = tool
-    // «Рука» — режим просмотра: смотреть и выделять можно, менять нельзя.
-    state.viewOnly = tool === 'HAND'
     if (tool !== 'SELECT') state.measurementMode = 'off'
     if (previous !== tool) emitEditorEvent('tool:changed', tool, previous)
   }
