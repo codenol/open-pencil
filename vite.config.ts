@@ -17,6 +17,7 @@ import {
   openPencilAutomationPlugin
 } from './vite/automation'
 import { copyCanvasKitAssetsPlugin } from './vite/canvaskit-assets'
+import { buildLabelPlugin } from './vite/build-label'
 import { openPencilPwaPlugin } from './vite/pwa'
 import { rawMarkdownPlugin } from './vite/raw-markdown'
 import { createDevServerOptions } from './vite/server'
@@ -39,6 +40,7 @@ export default defineConfig(async ({ command }) => {
       )
     },
     plugins: [
+      buildLabelPlugin(),
       rawMarkdownPlugin(),
       copyCanvasKitAssetsPlugin(),
       tailwindcss(),
