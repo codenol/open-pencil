@@ -1,6 +1,7 @@
 import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
 import { detectIssues } from './issues'
+import { detectRuleViolations } from './rule-issues'
 import type { DescribeIssue } from './issues'
 import { detectRole } from './roles'
 import { describeLayout, describeVisual, summarizeContainer, summarizeText } from './summaries'
@@ -72,6 +73,11 @@ export function describeOneNode(
   if (layout) result.layout = layout
   if (children.length > 0) result.children = children
   if (issues.length > 0) result.issues = issues
+
+  // Нарушения правил компонентов: ассистент не должен отчитаться «чисто»,
+  // пока они есть. Проверяем всё поддерево, а не только сам узел.
+  const ruleViolations = detectRuleViolations(figma.graph, [raw.id])
+  if (ruleViolations.length > 0) result.ruleViolations = ruleViolations
   return result
 }
 
