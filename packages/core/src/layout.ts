@@ -88,8 +88,17 @@ function computeLayoutsBottomUp(graph: SceneGraph, nodeId: string, visited: Set<
   }
 }
 
-function preservesImportedInstanceLayout(node: SceneNode): boolean {
-  return node.type === 'INSTANCE' && node.source.format === 'fig'
+/**
+ * Раньше инстансы, пришедшие из Figma, не пересчитывались вообще: считалось,
+ * что их размеры готовы и трогать их нельзя. Из-за этого «Заполнение» по
+ * ширине записывалось в данные, но ни на что не влияло — раскладка просто
+ * не считалась, и ширина оставалась прежней.
+ *
+ * Теперь раскладка считается всегда. Явно выставленные человеком размеры
+ * и «Заполнение» уважаются — это и есть смысл правки.
+ */
+function preservesImportedInstanceLayout(_node: SceneNode): boolean {
+  return false
 }
 
 function buildYogaTree(
@@ -275,17 +284,29 @@ function derivedMainAxisFitsParent(
   )
 }
 
+/**
+ * Растягивать ли ребёнка поперёк оси.
+ *
+ * «Заполнение» (`layoutAlignSelf: STRETCH`), выставленное человеком, уважаем
+ * всегда — независимо от того, откуда пришёл файл. Раньше для `.fig` этот
+ * случай отбрасывался: в панели стояло «Заполнение по ширине», а ширина
+ * оставалась прежней, потому что код считал такие размеры готовыми.
+ *
+ * Растяжение включаем, когда есть на чём считать: сохранённая раскладка
+ * родителя, либо сам родитель фиксированного размера (не «по содержимому»).
+ */
 function usesAuthoritativeGeneratedStretch(parent: SceneNode, child: SceneNode): boolean {
-  if (
-    child.layoutAlignSelf !== 'STRETCH' ||
-    parent.source.format === 'fig' ||
-    !parent.derivedLayout
-  ) {
-    return false
-  }
-  const derivedCrossSize =
-    parent.layoutMode === 'HORIZONTAL' ? parent.derivedLayout.height : parent.derivedLayout.width
-  const parentCrossSize = parent.layoutMode === 'HORIZONTAL' ? parent.height : parent.width
+  if (child.layoutAlignSelf !== 'STRETCH') return false
+
+  const isRow = parent.layoutMode === 'HORIZONTAL'
+  const parentSizing = isRow ? parent.counterAxisSizing : parent.counterAxisSizing
+  // Родитель «по содержимому» — тянуться некуда, ширину даёт содержимое.
+  if (parentSizing === 'HUG') return false
+
+  if (!parent.derivedLayout) return true
+
+  const derivedCrossSize = isRow ? parent.derivedLayout.height : parent.derivedLayout.width
+  const parentCrossSize = isRow ? parent.height : parent.width
   return derivedCrossSize !== undefined && Math.abs(derivedCrossSize - parentCrossSize) < 0.001
 }
 
