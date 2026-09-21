@@ -129,8 +129,11 @@ export function useLibraryManager(
     { immediate: true }
   )
 
-  const source = readLibraryCatalogSource()
-  if (source === 'storage' && !open.value) void setSource('storage')
+  // Сохранённый источник не применяем автоматически: если библиотека
+  // недоступна, это вылилось бы в ошибку при обычном открытии файла.
+  // Пользователь сам выберет источник в диалоге, там же увидит сообщение.
+  // Наследие: настройка могла остаться в режиме «библиотека» от прежних версий.
+  if (readLibraryCatalogSource() === 'storage') service.useLocalCatalog()
 
   return {
     section,
