@@ -41,17 +41,17 @@ import { IS_BROWSER } from '@/constants'
 const route = useRoute()
 const router = useRouter()
 const createdInitialTab = tabCount() === 0
-// Список файлов — точка входа, и его таб закреплён. Поэтому домашний таб
-// создаётся всегда: и на корне, и на /files. Исключение только тестовые
-// сборки и демо-страница, где нужен сразу холст.
-const shouldCreateHome =
-  (route.path === '/' || route.path === '/files') &&
-  !appRuntimeConfig.test &&
-  !route.meta.demo
+// Закреплённый таб «Файлы» должен быть на любом экране — он ведёт к списку.
+// Поэтому домашний таб создаётся всегда, включая адреса конкретных файлов
+// (/files/design/<id>, /files/library/<id>): файл открывается отдельным табом,
+// а «Файлы» остаётся первым. Исключение — тестовые сборки и демо-страница.
+const shouldCreateHome = !appRuntimeConfig.test && !route.meta.demo
 let firstTab = activeTab.value
 if (!firstTab) firstTab = shouldCreateHome ? createHomeTab() : createTab()
-// Адрес должен совпадать с открытым табом: список файлов живёт на /files.
-if (createdInitialTab && firstTab.kind === 'home' && route.path !== '/files') {
+// Список файлов живёт на /files, но если в адресе конкретный файл — его
+// не трогаем: адрес подставит сам файл, когда откроется.
+const isFilesRoute = route.path === '/files' || route.path.startsWith('/files/')
+if (createdInitialTab && firstTab.kind === 'home' && !isFilesRoute) {
   void router.replace('/files')
 }
 

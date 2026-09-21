@@ -119,11 +119,12 @@ export function leaveHome(tabId: string): void {
   tabsRef.value = tabsRef.value.with(tabIndex, { ...tab, kind: 'document' })
 }
 
+/**
+ * Новый документ всегда открывается отдельным табом: закреплённый таб
+ * «Файлы» не подменяется документом, список остаётся под рукой.
+ */
 export function createDocumentInCurrentTab(): Tab {
-  const current = activeTab.value
-  if (current?.kind !== 'home') return createTab()
-  leaveHome(current.id)
-  return getTabById(current.id) ?? current
+  return createTab()
 }
 
 export function showNewTab(): void {
@@ -221,16 +222,12 @@ function isDOMImportFile(file: File): boolean {
 
 function reusableTabStore(): { store: EditorStore; created: boolean } {
   const current = activeTab.value
-  if (current?.kind === 'home') {
-    leaveHome(current.id)
-    return { store: current.store, created: false }
-  }
+  // Закреплённый таб «Файлы» не подменяем на документ: он должен остаться
+  // в списке. Файл открывается отдельным табом.
+  if (current?.kind === 'home') return { store: createTab().store, created: true }
   const isUntouched =
     current?.store.state.documentName === 'Untitled' && !current.store.undo.canUndo
-  if (isUntouched) {
-    leaveHome(current.id)
-    return { store: current.store, created: false }
-  }
+  if (isUntouched) return { store: current.store, created: false }
   return { store: createTab().store, created: true }
 }
 
