@@ -46,6 +46,8 @@ interface DocumentComponentResult {
   type: string
   page: string
   source: 'document'
+  /** Что с компонентом можно сделать: виды, размеры, состояния. */
+  capabilities?: ComponentCapabilities
   /** Правила компонента — ассистент обязан их соблюдать. */
   rules?: ComponentRulesSummary
 }
@@ -63,12 +65,24 @@ interface LibraryComponentResult {
   priority: number
 }
 
+/** Сколько компонентов показываем в обзоре: хватает, чтобы спланировать. */
+const OVERVIEW_LIMIT = 60
+
 export const getComponents = defineTool({
   name: 'get_components',
   description:
-    'List reusable components from the document and enabled component libraries, optionally filtered by name. Components may carry rules (purpose, mustNot) — obey them when using the component.',
+    'List reusable components with what they can do (variants, sizes, sentiments). Use `overview` to see everything at once before planning — it replaces a series of separate searches. Components may carry rules (purpose, mustNot) — obey them when using the component.',
   execution: { kind: 'async', mutation: 'none' },
   input: v.object({
+    overview: v.optional(
+      v.pipe(
+        v.boolean(),
+        v.description(
+          'Return a compact overview of all components: name, capabilities, default variant. Use this once before planning a composition instead of several searches.'
+        )
+      ),
+      false
+    ),
     name: v.optional(
       v.pipe(v.string(), v.description('Filter by name (case-insensitive substring)'))
     ),
@@ -99,12 +113,14 @@ export const getComponents = defineTool({
           if (node.type !== 'COMPONENT' && node.type !== 'COMPONENT_SET') return false
           if (nameFilter && !node.name.toLowerCase().includes(nameFilter)) return false
           const rules = summarizeRules(figma.graph.getNode(node.id))
+          const capabilities = describeCapabilities(figma.graph, node.id) ?? undefined
           documentComponents.push({
             id: node.id,
             name: node.name,
             type: node.type,
             page: page.name,
             source: 'document',
+            ...(capabilities ? { capabilities } : {}),
             ...(rules ? { rules } : {})
           })
           return false
@@ -142,7 +158,31 @@ export const getComponents = defineTool({
         const rightPriority = 'priority' in right ? right.priority : -1
         return rightPriority - leftPriority || left.name.localeCompare(right.name)
       })
-      .slice(0, limit)
-    return { count: components.length, components }
+      .slice(0, args.overview ? OVERVIEW_LIMIT : limit)
+
+    if (!args.overview) return { count: components.length, components }
+
+    // Обзор: по каждому компоненту — имя, возможности и базовый вариант.
+    // Одного вызова хватает, чтобы составить план: не нужно искать по частям
+    // и разбирать каждый компонент отдельно.
+    const overviewItems = components.map((component) => {
+      const id = 'id' in component ? component.id : null
+      const variant = id ? resolveDefaultVariant(figma.graph, id) : null
+      return {
+        name: component.name,
+        ...(id ? { id } : {}),
+        ...('libraryId' in component ? { libraryId: component.libraryId } : {}),
+        ...('assetKey' in component ? { assetKey: component.assetKey } : {}),
+        ...('page' in component ? { page: component.page } : {}),
+        ...('capabilities' in component && component.capabilities
+          ? {
+              variants: component.capabilities.variantCount,
+              can: component.capabilities.summary
+            }
+          : {}),
+        ...(variant ? { defaultVariant: variant.variantName } : {})
+      }
+    })
+    return { count: overviewItems.length, overview: true, components: overviewItems }
   }
 })
