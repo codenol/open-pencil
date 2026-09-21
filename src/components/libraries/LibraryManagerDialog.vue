@@ -15,7 +15,6 @@ import {
   AppDialogRoot
 } from '@/components/ui/dialog'
 import AppPlaceholder from '@/components/ui/feedback/AppPlaceholder.vue'
-import SegmentedControl from '@/components/ui/select/SegmentedControl.vue'
 import AppTabsContent from '@/components/ui/tabs/AppTabsContent.vue'
 import AppTabsList from '@/components/ui/tabs/AppTabsList.vue'
 import AppTabsRoot from '@/components/ui/tabs/AppTabsRoot.vue'
@@ -42,7 +41,6 @@ const {
   showAllPages,
   applying,
   visibleUpdateGroups,
-  setSource,
   toggleLibrary,
   preferLibrary,
   updateAsset,
@@ -51,10 +49,6 @@ const {
 watch(open, (isOpen) => {
   if (isOpen) section.value = initialSection
 })
-function selectSource(value: string) {
-  if (value === 'local' || value === 'storage') void setSource(value)
-}
-
 function reviewUpdate(group: (typeof visibleUpdateGroups.value)[number]) {
   const initialInstanceId = group.instanceIds[0]
   if (!initialInstanceId) return
@@ -98,17 +92,6 @@ function reviewUpdate(group: (typeof visibleUpdateGroups.value)[number]) {
       </AppTabsList>
       <AppTabsContent value="browse" as-child>
         <AppDialogBody>
-          <SegmentedControl
-            required
-            class="mb-4"
-            :model-value="service.catalogSource"
-            :label="panels.browseLibraries"
-            :options="[
-              { value: 'local', label: panels.localLibraries },
-              { value: 'storage', label: panels.storageLibraries }
-            ]"
-            @update:model-value="selectSource"
-          />
           <div
             v-for="library in service.summaries.value"
             :key="library.libraryId"

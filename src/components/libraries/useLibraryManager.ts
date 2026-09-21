@@ -129,8 +129,11 @@ export function useLibraryManager(
     { immediate: true }
   )
 
+  // Каталог библиотек OpenPencil здесь не используется: библиотека у нас — это
+  // обычный файл в хранилище, который открывается и правится как канвас.
+  // Настройка могла остаться с прошлых версий — приводим её к локальной.
   const source = readLibraryCatalogSource()
-  if (source === 'storage' && !open.value) void setSource('storage')
+  if (source === 'storage') void setSource('local')
 
   return {
     section,
