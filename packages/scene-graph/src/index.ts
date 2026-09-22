@@ -689,3 +689,5 @@ export class SceneGraph {
     return result
   }
 }
+
+export { safeClone, safeCloneNode } from './safe-clone'

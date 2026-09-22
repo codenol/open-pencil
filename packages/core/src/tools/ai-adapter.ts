@@ -5,6 +5,7 @@
  */
 
 // eslint-disable-next-line open-pencil/no-mixed-case-acronym-identifiers -- Upstream export spelling.
+import { safeCloneNode } from '@open-pencil/scene-graph'
 import { toStandardJsonSchema as toStandardJSONSchema } from '@valibot/to-json-schema'
 import type { ToolSet, tool as createTool } from 'ai'
 
@@ -99,7 +100,7 @@ function captureNodeSnapshot(
   if (!targetId) return undefined
   const raw = figma.graph.getNode(targetId)
   if (!raw) return undefined
-  return Object.fromEntries(Object.entries(structuredClone(raw)))
+  return Object.fromEntries(Object.entries(safeCloneNode(raw)))
 }
 
 function emitToolLog(
