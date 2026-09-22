@@ -2,6 +2,7 @@ import { safeDestr } from 'destr'
 import { createTwoFilesPatch } from 'diff'
 import * as v from 'valibot'
 
+import { safeCloneNode } from '@open-pencil/scene-graph'
 import type { SceneNode } from '@open-pencil/scene-graph'
 
 import { colorToHex, parseColor } from '#core/color'
@@ -204,7 +205,7 @@ export const diffShow = defineTool({
       return { error: 'Invalid JSON in props' }
     }
 
-    const modified: SceneNode = structuredClone(raw)
+    const modified: SceneNode = safeCloneNode(raw)
     if (newProps.fill) {
       modified.fills = [
         { type: 'SOLID', color: parseColor(newProps.fill as string), opacity: 1, visible: true }

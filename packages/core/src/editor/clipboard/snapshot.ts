@@ -1,3 +1,4 @@
+import { safeCloneNode } from '@open-pencil/scene-graph'
 import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
 import { captureClipboardVariables, type ClipboardVariables } from './variables'
@@ -44,7 +45,7 @@ export function captureClipboardSnapshot(
       const bytes = graph.images.get(paint.imageHash)
       if (bytes) images.set(paint.imageHash, bytes.slice())
     }
-    return { ...structuredClone(node), children: graph.getChildren(node.id).map(capture) }
+    return { ...safeCloneNode(node), children: graph.getChildren(node.id).map(capture) }
   }
   const nodes = roots.map(capture)
   const componentDependencies = new Map<string, ClipboardNodeTree>()
@@ -64,7 +65,7 @@ export function captureClipboardSnapshot(
   const styleIds = referencedStyleIds(capturedNodes)
   const styleDefinitions: SceneNode[] = []
   for (const node of graph.getAllNodes()) {
-    if (node.source.id && styleIds.has(node.source.id)) styleDefinitions.push(structuredClone(node))
+    if (node.source.id && styleIds.has(node.source.id)) styleDefinitions.push(safeCloneNode(node))
   }
   return {
     sourceRootId: graph.rootId,
