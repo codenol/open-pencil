@@ -10,7 +10,10 @@ import type { ExplicitSnapTarget } from '#vue/shared/input/snap'
 function pageGuideTargets(editor: Editor): ExplicitSnapTarget[] {
   const page = editor.graph.getNode(editor.state.currentPageId)
   if (!page) return []
-  return page.guides.map((guide) => ({
+  // Направляющие могут отсутствовать: узел, собранный в скрипте, не обязан
+  // нести это поле. Без проверки перебор падает на «guides is not iterable».
+  const guides = page.guides ?? []
+  return guides.map((guide) => ({
     kind: 'canvas-guide',
     axis: guide.axis,
     position: guide.position,
