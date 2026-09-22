@@ -25,6 +25,23 @@ export interface ScopedCheckpoint {
   restore: () => void
 }
 
+/**
+ * Безопасная копия значения.
+ *
+ * `structuredClone` падает на символах и функциях, а в свойствах узла
+ * встречаются служебные значения вроде `Symbol(mixed)`. Копируем только
+ * то, что действительно копируется, остальное переносим по ссылке —
+ * для отката этого достаточно.
+ */
+function safeClone<T>(value: T): T {
+  if (value === null || typeof value !== 'object') return value
+  try {
+    return structuredClone(value)
+  } catch {
+    return value
+  }
+}
+
 /** Поля, которые описывают структуру, а не свойства. */
 const STRUCTURE_FIELDS = ['id', 'type', 'parentId', 'childIds', 'componentId'] as const
 
@@ -46,7 +63,7 @@ export function captureScopedCheckpoint(
     const node = graph.getNode(id)
     if (!node) continue
     // Копия свойств без структуры: её изменение всё равно недопустимо.
-    const values = structuredClone({ ...node }) as Partial<SceneNode>
+    const values = safeClone({ ...node }) as Partial<SceneNode>
     for (const field of STRUCTURE_FIELDS) Reflect.deleteProperty(values, field)
     before.set(id, values)
     structure.set(id, structureKey(node))
@@ -76,7 +93,7 @@ export function captureScopedCheckpoint(
             if (STRUCTURE_FIELDS.includes(key as (typeof STRUCTURE_FIELDS)[number])) continue
             if (!(key in values)) Reflect.deleteProperty(node, key)
           }
-          Object.assign(node, structuredClone(values))
+          Object.assign(node, safeClone(values))
         }
       })
     }
@@ -111,8 +128,8 @@ export function scopedChanges(
       const current = node[key]
       const before = previous[key]
       if (isEqual(before, current)) continue
-      ;(after as Record<string, unknown>)[key] = structuredClone(current)
-      ;(changedBefore as Record<string, unknown>)[key] = structuredClone(before)
+      ;(after as Record<string, unknown>)[key] = safeClone(current)
+      ;(changedBefore as Record<string, unknown>)[key] = safeClone(before)
     }
     if (Object.keys(after).length > 0) result.push({ id, before: changedBefore, after })
   }
