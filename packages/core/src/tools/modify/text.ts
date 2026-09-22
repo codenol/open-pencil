@@ -104,10 +104,36 @@ export const setTextResize = defineTool({
   execute: (figma, { id, mode }) => {
     const node = figma.getNodeById(id)
     if (!node) return { error: `Node "${id}" not found` }
-    node.textAutoResize = mode
-    return { id, textAutoResize: mode }
+    const raw = figma.graph.getNode(id)
+    if (!raw) return { error: `Node "${id}" not found` }
+    // Смена режима сама по себе размер не пересчитывает: узел остаётся
+    // с прежней шириной, и раскладка вокруг него врёт. Считаем размер сразу.
+    const sized = applyTextAutoResize(raw, mode)
+    return { id, textAutoResize: mode, ...sized }
   }
 })
+
+/**
+ * Приводит размер текста в соответствие с режимом.
+ *
+ * С 'WIDTH_AND_HEIGHT' ширина и высота идут от содержимого, с 'HEIGHT' —
+ * ширина задана, высота от содержимого. Считаем через измерение текста:
+ * в агентском режиме рендерера нет, поэтому идём через OpenType, а он
+ * доступен всегда.
+ */
+function applyTextAutoResize(
+  node: SceneNode,
+  mode: 'NONE' | 'WIDTH_AND_HEIGHT' | 'HEIGHT' | 'TRUNCATE'
+): { width?: number; height?: number } {
+  node.textAutoResize = mode
+  if (mode === 'NONE' || mode === 'TRUNCATE') return {}
+  if (mode === 'HEIGHT') {
+    const measured = estimateTextSize(node, node.width)
+    return { height: measured.height }
+  }
+  const measured = estimateTextSize(node)
+  return { width: measured.width, height: measured.height }
+}
 
 export const setTextProperties = defineTool({
   name: 'set_text_properties',

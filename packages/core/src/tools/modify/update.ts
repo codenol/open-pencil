@@ -2,6 +2,7 @@ import * as v from 'valibot'
 
 import type { SceneNode } from '@open-pencil/scene-graph'
 
+import { estimateTextSize } from '#core/layout'
 import { assertNodeEditable } from '#core/editor/capabilities'
 import { toolNumber, nodeIdInput } from '#core/tools/input'
 import { defineTool, nodeNotFound } from '#core/tools/schema'
@@ -81,6 +82,20 @@ export const updateNode = defineTool({
     if (args.text !== undefined) {
       figma.graph.updateNode(node.id, { text: args.text })
       updated.push('text')
+      // Текст изменился — размер надо пересчитать. Без этого ширина остаётся
+      // прежней, и раскладка вокруг текста врёт: чип не растёт под подпись,
+      // ячейка не подстраивается, колонка считает неверную ширину.
+      const textNode = figma.graph.getNode(node.id)
+      if (textNode && textNode.textAutoResize !== 'NONE') {
+        const measured =
+          textNode.textAutoResize === 'HEIGHT'
+            ? estimateTextSize(textNode, textNode.width)
+            : estimateTextSize(textNode)
+        const sizeUpdate: Partial<SceneNode> = { height: measured.height }
+        if (textNode.textAutoResize === 'WIDTH_AND_HEIGHT') sizeUpdate.width = measured.width
+        figma.graph.updateNode(node.id, sizeUpdate)
+        updated.push('size')
+      }
     }
     if (args.text_direction !== undefined) {
       figma.graph.updateNode(node.id, {
