@@ -110,7 +110,9 @@ const status = computed(() => chat.value?.status ?? 'ready')
 watchEffect(() => {
   setAssistantBusy(status.value === 'submitted' || status.value === 'streaming')
 })
-onScopeDispose(() => setAssistantBusy(false))
+// При уходе панели работу не обрываем: счётчик времени должен остаться
+// на экране, чтобы было видно, сколько она заняла. Сбрасывает его только
+// начало следующей работы.
 
 /**
  * Не даём браузеру усыпить вкладку, пока ассистент работает.
