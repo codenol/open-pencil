@@ -31,7 +31,10 @@ import {
 
 const LEGACY_CONNECTION_ID = 'connection-default'
 const LEGACY_MODEL_ID: AIModelProfileId = 'model-default'
-const DEFAULT_MAX_OUTPUT_TOKENS = 16_384
+// Большая сборка — страница с каркасом, таблицей и наполнением — пишется
+// одним ответом и в 16 тысяч токенов не влезает: ответ обрывается на
+// середине, и работа пропадает. 32 тысячи дают запас.
+const DEFAULT_MAX_OUTPUT_TOKENS = 32_768
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
