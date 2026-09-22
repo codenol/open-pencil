@@ -1,6 +1,7 @@
 import type { UIMessage } from 'ai'
 import { ref, shallowRef } from 'vue'
 
+import { fetchRemoteConversation, listRemoteConversations } from './download'
 import { chatDocumentId, resolveChatDocumentId, type ChatDocumentEditor } from './document'
 import { createConversationStore } from './idb'
 import { restoreMessages } from './messages'
@@ -54,13 +55,48 @@ export function createConversationHistory<TChat extends HistoryChat>(
   }
 
   async function refresh() {
-    conversations.value = await store.list()
+    const local = await store.list()
+    // Логи выгружаются на сервер с самого начала, но обратно не читались:
+    // при перезагрузке вкладки разговор пропадал. Подхватываем то, чего нет
+    // в браузере, — по имени документа.
+    const remote = await listRemoteConversations(chatDocumentId(runtime.getEditor()))
+    if (remote.length === 0) {
+      conversations.value = local
+      return
+    }
+    const known = new Set(local.map((row) => row.id))
+    const extra = remote
+      .filter((row) => !known.has(row.id))
+      .map(
+        (row): Conversation => ({
+          id: row.id,
+          documentId: chatDocumentId(runtime.getEditor()),
+          documentName: row.documentName,
+          title: row.title,
+          titleSource: 'generated',
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          profileId: null,
+          backend: 'direct',
+          interrupted: false,
+          messages: []
+        })
+      )
+    conversations.value = [...local, ...extra].sort((a, b) =>
+      b.updatedAt.localeCompare(a.updatedAt)
+    )
   }
   function detach() {
     return session.detach(flush)
   }
 
   async function activate(conversation: Conversation) {
+    // Разговор может быть только на сервере: локальная копия теряется при
+    // перезагрузке вкладки. Подтягиваем сообщения, если их нет.
+    if (conversation.messages.length === 0 && conversation.titleSource === 'generated') {
+      const remote = await fetchRemoteConversation(conversation.documentId, conversation.id)
+      if (remote && remote.messages.length > 0) conversation = remote
+    }
     owner = runtime.getEditor()
     ownerRecoveryId = owner.getRecoveryId()
     session.restoreInterrupted(conversation.interrupted)
