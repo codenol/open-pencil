@@ -1,8 +1,10 @@
 import * as v from 'valibot'
 
+import { describeCapabilities, type ComponentCapabilities } from '#core/tools/capabilities'
 import { getComponentCatalog } from '#core/tools/component-catalog'
 import { toolNumber } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
+import { resolveDefaultVariant } from '#core/tools/default-variant'
 
 /**
  * Правила компонента, поднятые из pluginData. Краткая форма идёт в поиск:
