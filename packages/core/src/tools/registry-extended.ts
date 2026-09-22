@@ -42,6 +42,7 @@ import {
 import {
   diffJSX,
   getComponents,
+  listIcons,
   getCurrentPage,
   getFontStatus,
   getPageTree,
@@ -116,6 +117,8 @@ export const EXTENDED_TOOLS: ToolDef[] = [
   selectNodes,
   queryNodes,
   getComponents,
+  listIcons,
+  listIcons,
   listLibraries,
   insertLibraryComponent,
   getDefaultVariant,
