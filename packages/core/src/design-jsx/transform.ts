@@ -39,6 +39,49 @@ export function transformDesignJSXExpression(source: string): string {
         continue
       }
     }
-    throw expressionError
+    throw withHint(expressionError, trimmed)
   }
+}
+
+/**
+ * Поясняет ошибку разбора.
+ *
+ * Сообщения парсера вроде «Unexpected token (44:13)» называют позицию внутри
+ * обёрнутого выражения, а не строку авторского кода, и потому уводят в сторону:
+ * ассистент решил, что render обрывает большой JSX, и стал собирать мелкими
+ * порциями. На деле чаще всего не закрыт тег — тогда позиция указывает на
+ * строку после пропущенного закрытия.
+ */
+function withHint(error: unknown, source: string): Error {
+  const message = error instanceof Error ? error.message : String(error)
+  const hint = describeLikelyCause(source)
+  const wrapped = new Error(hint ? `${message}. ${hint}` : message)
+  if (error instanceof Error) wrapped.stack = error.stack
+  return wrapped
+}
+
+/**
+ * Догадка о причине: следим за глубиной вложенности по коду.
+ *
+ * Общий счёт открытых и закрытых тегов не помогает: их число может сойтись,
+ * а вложенность быть неверной — закрывающий тег встаёт не на своё место, и
+ * следующие элементы оказываются siblings вместо children.
+ */
+function describeLikelyCause(source: string): string {
+  const tags = source.match(/<\/?[A-Z][A-Za-z0-9]*[^>]*?>/g) ?? []
+  let depth = 0
+  let minDepth = 0
+  for (const tag of tags) {
+    if (/\/>$/.test(tag)) continue
+    if (tag.startsWith('</')) depth -= 1
+    else depth += 1
+    minDepth = Math.min(minDepth, depth)
+    if (minDepth < 0) {
+      return 'A closing tag does not match the opening order: an outer element was closed too early, and later content sits outside it. Check the nesting, do not shrink the code.'
+    }
+  }
+  if (depth !== 0) {
+    return `The nesting does not close: ${depth > 0 ? `${depth} element(s) left open` : 'too many closing tags'}. Check the nesting, do not shrink the code.`
+  }
+  return 'The nesting is uneven even though tags balance: an element closes before its siblings are written. Check the order, do not shrink the code.'
 }
