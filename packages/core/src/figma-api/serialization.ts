@@ -52,6 +52,11 @@ export function nodeProxyToJSON(
   const n = graph.getNode(nodeId)
   if (!n) return { id: nodeId, removed: true }
 
+  // Узел внутри инстанса — это переопределение: его можно менять и наполнять,
+  // связь с компонентом при этом сохраняется. Без подсказки ассистент тратит
+  // пробный рендер, чтобы выяснить это опытным путём.
+  const insideInstance = isInsideInstance(graph, n)
+
   const obj: Record<string, unknown> = {
     id: n.id,
     type: n.type,
