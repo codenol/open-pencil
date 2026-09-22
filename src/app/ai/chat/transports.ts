@@ -13,7 +13,7 @@ import { buildReasoningProviderOptions, type AIProviderOptions } from '@/app/ai/
 import { compressStepHistory, KEEP_FULL_MESSAGES } from '@/app/ai/chat/compress-history'
 import { activeSystemPrompt } from '@/app/ai/chat/prompt-settings'
 import { createAIModelRuntime, resolveModelConnectionAPIKey } from '@/app/ai/models'
-import { createAITools, recordStep, resetRunSteps } from '@/app/ai/tools'
+import { createAITools, markRunUnfinished, recordStep, resetRunSteps } from '@/app/ai/tools'
 import { enabledAIToolDefinitions } from '@/app/ai/tools/catalog'
 import { aiToolOverrides } from '@/app/ai/tools/preferences'
 import {
@@ -197,7 +197,13 @@ export function createChatSessionManager({
   ): void {
     if (!isAbort && !isDisconnect && !isError) {
       recordChatCompleted({ finishReason: finishReason ?? null }, context)
+      markRunUnfinished(false)
+      return
     }
+    // Оборвалось до конца работы: браузер усыпил вкладку, провайдер отказал,
+    // поток прерван. Работа сделана наполовину, и её надо уметь продолжить —
+    // иначе ассистент просто останавливается и ждёт непонятно чего.
+    markRunUnfinished(true)
   }
 
   function clearFailure(): void {

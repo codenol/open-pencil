@@ -9,7 +9,7 @@ import { chatDocumentId } from '@/app/ai/chat/history/document'
 import { setAssistantBusy } from '@/app/ai/chat/busy'
 import { useChatSubmission } from '@/app/ai/chat/submission/use'
 import { useAIChat } from '@/app/ai/chat/use'
-import { didHitStepLimit } from '@/app/ai/tools'
+import { didHitStepLimit, didRunStopEarly } from '@/app/ai/tools'
 import { getActiveEditorStore } from '@/app/editor/active-store'
 import { openSettingsDialog } from '@/app/settings/dialog'
 import { toast } from '@/app/shell/ui'
@@ -152,7 +152,10 @@ const showContinue = computed(() => {
   if (status.value !== 'ready') return false
   if (messages.value.length === 0) return false
   const last = messages.value[messages.value.length - 1]
-  return last.role === 'assistant' && didHitStepLimit()
+  // Продолжение предлагаем и при обрыве: лимит шагов — не единственная причина.
+  // Вкладка ушла в фон, провайдер отказал — работа сделана наполовину, и без
+  // кнопки ассистент просто останавливается.
+  return last.role === 'assistant' && (didHitStepLimit() || didRunStopEarly())
 })
 
 watch(
