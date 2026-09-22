@@ -137,6 +137,17 @@ export class FigmaAPI implements NodeProxyHost {
     return node ? this.wrapNode(id) : null
   }
 
+  /**
+   * Асинхронный вариант поиска узла — как в Figma Plugin API.
+   *
+   * У нас граф уже в памяти, поэтому результат готов сразу. Метод нужен для
+   * совместимости: ассистент знает Figma API и зовёт именно его, а без него
+   * получал «getNodeByIdAsync is not a function» и тратил шаги на обход.
+   */
+  async getNodeByIdAsync(id: string): Promise<FigmaNodeProxy | null> {
+    return this.getNodeById(id)
+  }
+
   // --- Node Creation ---
 
   private _createNode(type: NodeType): FigmaNodeProxy {
