@@ -19,5 +19,20 @@ export const AUTHORING_EXAMPLES: readonly AuthoringExample[] = [
     jsx: dedent`<Frame name="Bound note" w={280} h="hug" flex="col" gap={designVar('Space/small')} p={designVar('Space/medium')} bg="#FFFFFF">
   <Text name="Message" w="fill" size={designVar('Type/body')} lineHeight={designVar('Type/body-leading')} letterSpacing={designVar('Type/body-tracking')} color="#252A31">A note that grows with its content.</Text>
 </Frame>`
+  },
+  {
+    title: 'An instance of an existing component',
+    jsx: dedent`<Instance name="Status badge" of="0:1234" x={0} y={0} />`
+  },
+  {
+    title: 'Variants of a component set',
+    jsx: dedent`<Frame name="Card actions" flex="row" gap={8}>
+  <Instance name="Save" of="button" Type="Filled" Size="Large" />
+  <Instance name="Cancel" of="button" Type="Outline" Size="Large" />
+</Frame>`
+  },
+  {
+    title: 'An instance label set through a component property',
+    jsx: dedent`<Instance name="Status" of="badge" Color="green" Content="Text only" properties={{ label: 'Working' }} />`
   }
 ]
