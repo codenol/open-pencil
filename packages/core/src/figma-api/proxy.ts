@@ -18,6 +18,7 @@ import {
 } from '#core/color/okhcl'
 import type { OkHCLColor, OkHCLPayload } from '#core/color/okhcl'
 import { assertNodeEditable } from '#core/editor/capabilities'
+import { readSlot } from '#core/tools/slots'
 
 import { installBasicNodeProxyAccessors } from './accessors/basic'
 import { installLayoutNodeProxyAccessors } from './accessors/layout'
@@ -237,6 +238,32 @@ export class FigmaNodeProxy {
     const inst = this[INTERNAL_GRAPH].createInstance(n.id, pageId)
     if (!inst) throw new Error('Failed to create instance')
     return this[INTERNAL_API].wrapNode(inst.id)
+  }
+
+  /**
+   * Слот ли этот узел.
+   *
+   * Метка лежит в pluginData, а ассистент проверяет свойства через API:
+   * `figma.getNodeById(id).isSlot`. Без такого поля он получал undefined,
+   * решал, что разметка врёт, и дальше действовал наугад.
+   */
+  get isSlot(): boolean {
+    return readSlot(this._raw()) !== null
+  }
+
+  /** Где слот: в мастере или в рабочей копии. Пусто, если это не слот. */
+  get slotScope(): 'master' | 'instance' | 'page' | undefined {
+    if (!this.isSlot) return undefined
+    const graph = this[INTERNAL_GRAPH]
+    let current = this._raw()
+    while (current.parentId) {
+      const parent = graph.getNode(current.parentId)
+      if (!parent) break
+      if (parent.type === 'COMPONENT' || parent.type === 'COMPONENT_SET') return 'master'
+      if (parent.type === 'INSTANCE') return 'instance'
+      current = parent
+    }
+    return 'page'
   }
 
   /**
