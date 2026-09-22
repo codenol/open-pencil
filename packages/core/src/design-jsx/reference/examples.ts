@@ -21,6 +21,32 @@ export const AUTHORING_EXAMPLES: readonly AuthoringExample[] = [
 </Frame>`
   },
   {
+    title: 'Text with font, size and weight',
+    jsx: dedent`<Text name="Heading" font="Roboto" size={18} weight={600} lineHeight={24} color="#26292E">Кластеры PostgreSQL</Text>`
+  },
+  {
+    title: 'Text that fills the remaining width',
+    jsx: dedent`<Frame name="Row" flex="row" gap={8} w="fill" items="center">
+  <Text name="Label" grow={1} font="Roboto" size={14} lineHeight={20} color="#26292E">Реплика pg-core-02</Text>
+  <Text name="Value" font="Roboto" size={14} lineHeight={20} color="#6B7280">16.3</Text>
+</Frame>`
+  },
+  {
+    title: 'A glyph drawn inline with svg',
+    jsx: dedent`<svg name="chevron" size={16} viewBox="0 0 24 24" stroke="#6B7280">
+  <path d="M9 6 L15 12 L9 18" fill="none" stroke-width="2" />
+</svg>`
+  },
+  {
+    title: 'An svg glyph inside a row',
+    jsx: dedent`<Frame name="Sort header" flex="row" gap={4} items="center">
+  <Text name="Title" font="Roboto" size={14} weight={500} color="#26292E">Версия ПО</Text>
+  <svg name="sort" size={16} viewBox="0 0 24 24" stroke="#26292E">
+    <path d="M7 10 L12 5 L17 10" fill="none" stroke-width="2" />
+  </svg>
+</Frame>`
+  },
+  {
     title: 'An instance of an existing component',
     jsx: dedent`<Instance name="Status badge" of="0:1234" x={0} y={0} />`
   },
