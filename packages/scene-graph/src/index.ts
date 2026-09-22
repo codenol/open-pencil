@@ -96,6 +96,11 @@ function stripUndefinedProps<T extends object>(obj: T): T {
 }
 
 export { captureGraphCheckpoint } from './checkpoint'
+export {
+  captureScopedCheckpoint,
+  scopedChanges,
+  type ScopedCheckpoint
+} from './scoped-checkpoint'
 
 export class SceneGraph {
   nodes = new Map<string, SceneNode>()

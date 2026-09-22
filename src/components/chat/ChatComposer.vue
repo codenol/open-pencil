@@ -28,24 +28,31 @@ const isStreaming = computed(() => disabled || status === 'streaming' || status 
  * или встал. Считаем от начала работы и обнуляем по её окончании.
  */
 const elapsed = ref(0)
+/** Время последней законченной работы: остаётся на экране, пока не начнётся новая. */
+const lastRun = ref(0)
 let timer: ReturnType<typeof setInterval> | undefined
 
 watch(isStreaming, (active) => {
   clearInterval(timer)
   if (!active) {
-    elapsed.value = 0
+    // Не обнуляем: по окончании работы видно, сколько она заняла.
+    lastRun.value = elapsed.value
     return
   }
   const startedAt = Date.now()
   elapsed.value = 0
+  lastRun.value = 0
   timer = setInterval(() => (elapsed.value = Date.now() - startedAt), 1000)
 })
 
 onScopeDispose(() => clearInterval(timer))
 
+/** Показываем текущее время работы, а после — сколько она заняла. */
+const shownTime = computed(() => (isStreaming.value ? elapsed.value : lastRun.value))
+
 /** Минуты и секунды: `1:07`, `0:12`. */
 const elapsedLabel = computed(() => {
-  const total = Math.floor(elapsed.value / 1000)
+  const total = Math.floor(shownTime.value / 1000)
   const minutes = Math.floor(total / 60)
   const seconds = total % 60
   return `${minutes}:${String(seconds).padStart(2, '0')}`
@@ -93,11 +100,12 @@ function handleSubmit(event: Event) {
 
           <template #actions>
             <span
-              v-if="isStreaming && elapsed > 0"
-              data-test-id="chat-elapsed"
+              v-if="shownTime > 0"
+              :data-test-id="isStreaming ? 'chat-elapsed' : 'chat-elapsed-done'"
               class="mr-0.5 text-[11px] tabular-nums text-muted"
+              :title="isStreaming ? ai.generating : ai.lastRunTime"
             >
-              {{ elapsedLabel }}
+              {{ isStreaming ? elapsedLabel : `${ai.took} ${elapsedLabel}` }}
             </span>
             <IconButton
               :label="ai.providerSettings"

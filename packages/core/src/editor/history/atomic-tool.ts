@@ -1,49 +1,45 @@
-import { isEqual } from 'es-toolkit'
-
 import {
-  captureGraphCheckpoint,
+  captureScopedCheckpoint,
+  scopedChanges,
   type SceneGraph,
-  type SceneNode,
-  type Variable
+  type SceneNode
 } from '@open-pencil/scene-graph'
 
 import type { Editor } from '#core/editor/create'
 import type { FigmaAPI } from '#core/figma-api'
 import { isAtomicTool, type ToolDef } from '#core/tools/schema'
 
-// Capture property changes across pages. Component synchronization remains editor-owned.
-const MAX_TRANSACTION_NODES = 10_000
+/** Снимок узла: какие свойства были до правки. */
+type ScopedChange = { id: string; before: Partial<SceneNode>; after: Partial<SceneNode> }
+
+/** Поля структуры: их точечная правка менять не вправе. */
+const STRUCTURE_FIELDS: string[] = ['id', 'type', 'parentId', 'childIds', 'componentId']
 
 type MutationEditor = Pick<Editor, 'graph' | 'runLayoutForNode' | 'requestRender' | 'pushUndoEntry'>
-type Changes<T> = {
-  id: string
-  before: Partial<T>
-  after: Partial<T>
-  absent: Record<'before' | 'after', (keyof T)[]>
-}
 
-function changes<T extends object>(before: Map<string, T>, after: Map<string, T>): Changes<T>[] {
-  const result: Changes<T>[] = []
-  for (const [id, previous] of before) {
-    const current = after.get(id)
-    if (!current) throw new Error('Atomic tools must not remove nodes or variables')
-    const inverse: Partial<T> = {}
-    const forward: Partial<T> = {}
-    const absent: Changes<T>['absent'] = { before: [], after: [] }
-    const keys = new Set([...Object.keys(previous), ...Object.keys(current)] as (keyof T)[])
-    for (const key of keys) {
-      const existed = Object.hasOwn(previous, key)
-      const exists = Object.hasOwn(current, key)
-      if (existed === exists && isEqual(previous[key], current[key])) continue
-      inverse[key] = structuredClone(previous[key])
-      forward[key] = structuredClone(current[key])
-      if (!existed) absent.before.push(key)
-      if (!exists) absent.after.push(key)
-    }
-    if (Object.keys(forward).length) result.push({ id, before: inverse, after: forward, absent })
+
+/**
+ * Какие узлы инструмент собирается изменить.
+ *
+ * Инструмент называет цель в аргументах: `id`, `node_id`, `ids`. Если цели
+ * нет (работа по выделению), снимаем выделенные.
+ */
+function targetIds(figma: FigmaAPI, args: Record<string, unknown>): string[] {
+  const collected: string[] = []
+  for (const key of ['id', 'node_id', 'nodeId', 'ids', 'node_ids']) {
+    const value = args[key]
+    if (typeof value === 'string') collected.push(value)
+    else if (Array.isArray(value)) collected.push(...value.filter((v) => typeof v === 'string'))
   }
-  if (before.size !== after.size) throw new Error('Atomic tools must not create nodes or variables')
-  return result
+  for (const key of ['source_id', 'target_id']) {
+    const value = args[key]
+    if (typeof value === 'string') collected.push(value)
+  }
+  if (collected.length === 0) {
+    const selection = figma.currentPage?.selection ?? []
+    collected.push(...selection.map((node) => node.id))
+  }
+  return collected
 }
 
 /**
@@ -64,39 +60,35 @@ export function executeAtomicTool(
     throw new Error('The target document is no longer open')
   }
   const graph = figma.graph
-  if (graph.nodes.size + graph.variables.size > MAX_TRANSACTION_NODES) {
-    throw new Error('Document too large for atomic agent editing (maximum 10000 nodes)')
-  }
-  const checkpoint = captureGraphCheckpoint(graph)
-  const { nodes, variables } = checkpoint
   const pageId = figma.currentPageId
 
-  const replay = (
-    nodeChanges: Changes<SceneNode>[],
-    variableChanges: Changes<Variable>[],
-    direction: 'before' | 'after'
-  ) => {
+  // Снимаем только те узлы, которые инструмент собирается менять.
+  // Общий снимок графа копировал весь документ целиком — на дизайн-системе
+  // это десятки тысяч объектов ради изменения заливки, поэтому для больших
+  // документов правки просто запрещались. Точечный снимок снимает запрет:
+  // структуру инструмент и так менять не вправе.
+  const checkpoint = captureScopedCheckpoint(graph, targetIds(figma, args))
+
+  const replay = (nodeChanges: ScopedChange[], direction: 'before' | 'after') => {
     if (editor.graph !== graph) throw new Error('The target document has been replaced')
-    for (const change of variableChanges) {
-      const variable = graph.variables.get(change.id)
-      if (variable) {
-        Object.assign(variable, structuredClone(change[direction]))
-        for (const key of change.absent[direction]) Reflect.deleteProperty(variable, key)
-      }
-    }
     graph.preserveSourceMetadataDuring(() => {
-      for (const change of nodeChanges)
-        graph.restoreNodeProperties(
-          change.id,
-          structuredClone(change[direction]),
-          change.absent[direction]
-        )
+      for (const change of nodeChanges) {
+        const node = graph.getNode(change.id)
+        if (!node) continue
+        const values = change[direction]
+        for (const key of Object.keys(node) as (keyof SceneNode)[]) {
+          if (!(key in values) && !STRUCTURE_FIELDS.includes(key)) {
+            Reflect.deleteProperty(node, key)
+          }
+        }
+        Object.assign(node, structuredClone(values))
+      }
     })
     layout(
       graph,
       editor,
       pageId,
-      variableChanges.length > 0,
+      false,
       nodeChanges.map((change) => change.id)
     )
     editor.requestRender()
@@ -108,25 +100,19 @@ export function executeAtomicTool(
     if (result && typeof result === 'object' && 'error' in result) {
       throw new Error(String(result.error))
     }
-    checkpoint.assertPropertiesOnly()
-    const variableChanges = changes(variables, graph.variables)
-    layout(
-      graph,
-      editor,
-      pageId,
-      variableChanges.length > 0,
-      changes(nodes, graph.nodes).map((change) => change.id)
+    if (!checkpoint.structureIntact()) {
+      throw new Error('Atomic tools must not change node hierarchy or identity')
+    }
+    const nodeChanges = scopedChanges(graph, checkpoint)
+    const contentChanged = nodeChanges.some((change) =>
+      Object.keys(change.after).some((key) => key !== 'source')
     )
-    const nodeChanges = changes(nodes, graph.nodes)
-    const contentChanged =
-      variableChanges.length > 0 ||
-      nodeChanges.some((change) => Object.keys(change.after).some((key) => key !== 'source'))
-    if (!contentChanged && nodeChanges.length) replay(nodeChanges, [], 'before')
+    if (!contentChanged && nodeChanges.length) replay(nodeChanges, 'before')
     if (contentChanged) {
       editor.pushUndoEntry({
         label: `${options.label ?? 'Agent'}: ${def.name}`,
-        inverse: () => replay(nodeChanges, variableChanges, 'before'),
-        forward: () => replay(nodeChanges, variableChanges, 'after')
+        inverse: () => replay(nodeChanges, 'before'),
+        forward: () => replay(nodeChanges, 'after')
       })
       editor.requestRender()
     }
