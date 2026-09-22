@@ -8,6 +8,7 @@ import type {
   VariableValue
 } from '@open-pencil/scene-graph'
 import { copyFills, copyStrokes, copyEffects } from '@open-pencil/scene-graph/copy'
+import { getSharedStyles } from '@open-pencil/scene-graph'
 import { computeBounds } from '@open-pencil/scene-graph/geometry'
 import { computeImageHash } from '@open-pencil/scene-graph/images'
 import type { Rect, Vector } from '@open-pencil/scene-graph/primitives'
@@ -542,6 +543,37 @@ export class FigmaAPI implements NodeProxyHost {
 
   async loadFontAsync(_fontName: FigmaFontName): Promise<void> {
     // No-op: we don't gate text editing on font loading
+  }
+
+  /**
+   * Локальные стили заливки, обводки, текста, эффектов и сеток.
+   *
+   * В Figma это отдельная коллекция, у нас стили лежат в графе. Ассистент
+   * звал этот метод и падал; здесь отдаём то, что есть, в привычной форме —
+   * с полями id, name, type и key.
+   */
+  getLocalPaintStyles(): Array<{ id: string; name: string; type: string; key: string }> {
+    return [...getSharedStyles(this.graph, 'fill'), ...getSharedStyles(this.graph, 'stroke')].map(
+      (style) => ({ id: style.id, name: style.name, type: style.type, key: style.id })
+    )
+  }
+
+  getLocalTextStyles(): Array<{ id: string; name: string; type: string; key: string }> {
+    return getSharedStyles(this.graph, 'text').map((style) => ({
+      id: style.id,
+      name: style.name,
+      type: style.type,
+      key: style.id
+    }))
+  }
+
+  getLocalEffectStyles(): Array<{ id: string; name: string; type: string; key: string }> {
+    return getSharedStyles(this.graph, 'effect').map((style) => ({
+      id: style.id,
+      name: style.name,
+      type: style.type,
+      key: style.id
+    }))
   }
 
   async listAvailableFontsAsync(): Promise<FigmaFont[]> {
