@@ -35,6 +35,8 @@ import {
   setRotation,
   setStrokeAlign,
   setTextResize,
+  swapComponent,
+  swapComponentSize,
   setVisible
 } from './modify'
 import {
@@ -146,6 +148,8 @@ export const EXTENDED_TOOLS: ToolDef[] = [
   setMinMax,
   setFontRange,
   setTextResize,
+  swapComponent,
+  swapComponentSize,
   setBlend,
   setLocked,
   setStrokeAlign,
