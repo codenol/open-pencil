@@ -2,6 +2,12 @@ export { prefetchFigmaSchema } from '#core/clipboard'
 export { readFigFile, parseFigFile } from './fig/file'
 export { importNodeChanges } from './fig/import'
 export { populateAllLazyFigImportRoots, populateLazyFigImportRoots } from './fig/lazy-import'
+// Снятие кэша исходного архива: без него сборка файла отдаёт исходный
+// и правки теряются.
+export {
+  releaseFigPopulationWorker,
+  canUseFigPopulationWorker
+} from './fig/population/client'
 export { deduplicateNodeChangePluginData } from '@open-pencil/kiwi/fig/parse'
 export {
   initCodec,

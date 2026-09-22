@@ -77,7 +77,11 @@ export function registerOriginalArchiveRequest(
 ): void {
   const entry: OriginalArchiveRequest = { request, valid: true, unbind: () => undefined }
   const invalidate = () => {
-    if (!graph.isApplyingLayout) entry.valid = false
+    // Раскладка — производное значение, но её пересчёт идёт вместе с правкой
+    // документа. Пропускать инвалидацию при раскладке нельзя: после сборки
+    // узла архив оставался «валидным», и сохранение отдавало исходный файл —
+    // работа пропадала, хотя время обновлялось.
+    entry.valid = false
   }
   entry.unbind = graph.onNodeEvents({
     created: invalidate,
