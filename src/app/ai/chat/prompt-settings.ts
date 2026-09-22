@@ -1,6 +1,7 @@
 import { useLocalStorage } from '@vueuse/core'
 
-import DEFAULT_SYSTEM_PROMPT from '@/app/ai/chat/system-prompt.md?raw'
+import DEFAULT_SYSTEM_PROMPT from '@/app/ai/chat/system-prompt'
+import behaviorPrompt from '@/app/ai/chat/system-prompt.md?raw'
 
 /**
  * Характер ассистента — то, как он себя ведёт в чате.
@@ -9,7 +10,17 @@ import DEFAULT_SYSTEM_PROMPT from '@/app/ai/chat/system-prompt.md?raw'
  * настройках модели: правка хранится отдельно и используется вместо базовой.
  * Сброс возвращает исходный текст.
  */
+/**
+ * Текст, с которым работает ассистент: характер плюс справка по JSX.
+ *
+ * Справка — это часть общей картины, а не отдельный файл: без неё ассистент
+ * не знает синтаксиса (шрифт, svg, свойства) и выясняет его опытным путём,
+ * читая чужие узлы и делая пробные рендеры.
+ */
 const DEFAULT_PROMPT = DEFAULT_SYSTEM_PROMPT.trim()
+
+/** Только характер, без справки: для показа в настройках. */
+export const BEHAVIOR_PROMPT = behaviorPrompt.trim()
 
 export const customSystemPrompt = useLocalStorage<string>('open-pencil:ai:system-prompt', '')
 
@@ -32,6 +43,16 @@ export function resetSystemPrompt(): void {
   customSystemPrompt.value = ''
 }
 
+/**
+ * Текст для поля настроек — характер без справки.
+ *
+ * Справку не показываем на правку: она большая и меняется вместе с кодом.
+ */
 export function defaultSystemPrompt(): string {
+  return BEHAVIOR_PROMPT
+}
+
+/** Рабочий текст целиком: характер плюс справка. */
+export function fullSystemPrompt(): string {
   return DEFAULT_PROMPT
 }
