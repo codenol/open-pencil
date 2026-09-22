@@ -239,6 +239,22 @@ export class FigmaNodeProxy {
     return this[INTERNAL_API].wrapNode(inst.id)
   }
 
+  /**
+   * Выгрузка узла в картинку — как в Figma Plugin API.
+   *
+   * Прямо из скрипта недоступна: рисование живёт в интерфейсе, и моста к нему
+   * здесь нет. Заглушка нужна, чтобы ассистент не тратил шаги на попытки —
+   * он знает Figma API и зовёт этот метод, а получал «not a function» и уходил
+   * искать обходной путь. Для осмотра результата есть зрение: рендер узла и
+   * вопрос к модели.
+   */
+  async exportAsync(_settings?: unknown): Promise<Uint8Array> {
+    throw new Error(
+      'exportAsync is not available in scripting: rendering lives in the app shell. ' +
+        'To look at a node, render it and inspect visually. To hand a file to the user, use the export controls in the interface.'
+    )
+  }
+
   // --- Tree ---
 
   get parent(): FigmaNodeProxy | null {
