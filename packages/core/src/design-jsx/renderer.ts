@@ -364,9 +364,18 @@ function inferComponentSetProperties(graph: SceneGraph, componentSetId: string):
   })
 }
 
+/**
+ * Поиск компонента по имени.
+ *
+ * Сравниваем имена без краевых пробелов: в дизайн-системе встречаются сеты
+ * с пробелом в начале или конце (« button», «Input datepicker »), и строгое
+ * сравнение их не находило — ассистент получал «component not found» для
+ * компонента, который есть.
+ */
 function findComponentByName(graph: SceneGraph, name: string): SceneNode | undefined {
+  const wanted = name.trim()
   for (const node of graph.getAllNodes()) {
-    if (node.type === 'COMPONENT' && node.name === name) return node
+    if (node.type === 'COMPONENT' && node.name.trim() === wanted) return node
   }
   return undefined
 }
@@ -409,8 +418,9 @@ function resolveComponent(
   const byName = findComponentByName(graph, ref)
   if (byName) return byName
 
+  const wanted = ref.trim()
   for (const node of graph.getAllNodes()) {
-    if (node.type === 'COMPONENT_SET' && node.name === ref)
+    if (node.type === 'COMPONENT_SET' && node.name.trim() === wanted)
       return findVariantInSet(graph, node, props)
   }
   return undefined
