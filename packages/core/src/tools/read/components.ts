@@ -12,7 +12,8 @@ import { resolveDefaultVariant } from '#core/tools/default-variant'
  */
 interface ComponentRulesSummary {
   purpose: string
-  mustNot: string
+  checks?: string[]
+  mustNot: string[]
 }
 
 const RULES_PLUGIN_ID = 'norka.design-system'
@@ -30,13 +31,22 @@ function summarizeRules(node: ComponentRulesHolder | undefined): ComponentRulesS
   )
   if (!entry) return null
   try {
-    const parsed = JSON.parse(entry.value) as { purpose?: unknown; forbidden?: unknown }
+    const parsed = JSON.parse(entry.value) as {
+      purpose?: unknown
+      forbidden?: unknown
+      checks?: unknown
+    }
     const purpose = typeof parsed.purpose === 'string' ? parsed.purpose : ''
     const forbidden = Array.isArray(parsed.forbidden)
       ? parsed.forbidden.filter((item): item is string => typeof item === 'string')
       : []
+    const checks = Array.isArray(parsed.checks)
+      ? parsed.checks.filter((item): item is string => typeof item === 'string')
+      : []
     if (!purpose && forbidden.length === 0) return null
-    return { purpose, mustNot: forbidden[0] ?? '' }
+    // В поиске отдаём назначение, все запреты и проверки: решение «брать или
+    // нет» принимается здесь, а один запрет из шести не удержит от ошибки.
+    return { purpose, mustNot: forbidden, checks }
   } catch {
     return null
   }

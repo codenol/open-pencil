@@ -14,6 +14,7 @@ import { releaseOriginalFigArchive } from '/opt/open-pencil-clean/packages/core/
 
 const [input, output, ...flags] = process.argv.slice(2)
 const listOnly = flags.includes('--list')
+const only = flags.find((flag) => flag.startsWith('--only='))?.slice('--only='.length)
 
 const PLUGIN_ID = 'norka.design-system'
 const RULES_KEY = 'component-rules'
@@ -58,36 +59,109 @@ const ICON_RULES = {
   ]
 }
 
+/**
+ * Правила для мастера `Table`.
+ *
+ * Таблица — это НЕ фрейм с ячейками, который рисуют заново. Это готовый
+ * компонент: шапка + строки, и его наполняют, а не собирают.
+ *
+ * Разобрана по факту: `Table` 1615x542, шапка 1615x50, строка 1615x41.
+ * Колонки разной ширины: 160, 200, 220, 250. Строка — три слоя: линия
+ * разделителя, полоса под ней и содержимое на всю ширину.
+ */
+const TABLE_RULES = {
+  purpose: 'Показывает однотипные записи строками: инстансы, кластеры, узлы, ПАК.',
+  use: [
+    'Брать готовый компонент Table, а не рисовать таблицу фреймами и прямоугольниками.',
+    'Число строк — по числу записей: одна запись одна строка. Пустых строк не оставлять.',
+    'Колонки берутся из готового набора ширин: 160, 200, 220, 250. Не задавать ширину на глаз.',
+    'Текст ячейки — через текстовый узел внутри ячейки, не через подпись на весь фрейм.',
+    'Числа выравниваются по правому краю, текст и названия — по левому.',
+    'Одинаковые по смыслу значения пишутся одинаково во всей колонке: «Работает», а не «работает» местами.',
+    'Статус в ячейке — готовым бейджем из набора, а не покрашенным текстом.',
+    'Сортировку показывает иконка в шапке: sort-amount-up или sort-amount-down. Только на той колонке, по которой сортируют.'
+  ],
+  avoid: [
+    'Не собирать таблицу из прямоугольников, линий и текста вручную.',
+    'Не вставлять строку копией фрейма, если есть компонент строки.',
+    'Не красить строки зеброй, если макет этого не требует: разделители уже есть.',
+    'Не выравнивать колонки пробелами или пустыми фреймами-распорками.'
+  ],
+  allowed: [
+    'Менять текст в ячейках.',
+    'Добавлять и удалять строки по числу записей.',
+    'Менять ширину колонки на соседнюю из набора ширин.',
+    'Ставить иконку сортировки в шапку.',
+    'Ставить бейдж статуса в ячейку.',
+    'Скрывать колонку, если данных для неё нет во всех записях.'
+  ],
+  forbidden: [
+    'Рисовать таблицу с нуля фреймами, когда есть готовый компонент.',
+    'Задавать ширину колонок произвольным числом.',
+    'Растягивать таблицу по содержимому: ширина задаётся колонками.',
+    'Вставлять текст прямо во фрейм ячейки, минуя текстовый узел.',
+    'Оставлять заготовку вида «Column Name» или «VALUE» в готовом макете.',
+    'Придумывать колонки, которых нет в данных: пустая колонка хуже её отсутствия.'
+  ],
+  checks: [
+    'Таблица — готовый компонент, а не самодельные фреймы.',
+    'Число строк равно числу записей.',
+    'Ширины колонок из набора, а не произвольные.',
+    'В шапке нет заготовки «Column Name».',
+    'Статусы — бейджами из набора.',
+    'Иконка сортировки стоит только там, где есть сортировка.'
+  ]
+}
+
+const RULES_BY_MASTER = {
+  icon: ICON_RULES,
+  Table: TABLE_RULES
+}
+
 const bytes = new Uint8Array(await readFile(input))
 const parsed = figPkg.parseFigBuffer(bytes.buffer)
 const graph = corePkg.importNodeChanges(parsed.nodeChanges, parsed.blobs, new Map(parsed.images), {
   populate: 'none'
 })
 
-const masters = [...graph.nodes.values()].filter(
-  (node) => node.type === 'COMPONENT_SET' && node.name.trim() === 'icon'
-)
-if (!masters.length) {
-  console.error('мастер-сет "icon" не найден')
-  process.exit(1)
-}
-
-for (const master of masters) {
-  const entry = {
-    pluginId: PLUGIN_ID,
-    key: RULES_KEY,
-    value: JSON.stringify(ICON_RULES)
-  }
-  const rest = master.pluginData.filter(
-    (item) => !(item.pluginId === PLUGIN_ID && item.key === RULES_KEY)
+let written = 0
+for (const [masterName, rules] of Object.entries(RULES_BY_MASTER)) {
+  if (only && only !== masterName) continue
+  const masters = [...graph.nodes.values()].filter(
+    (node) =>
+      (node.type === 'COMPONENT_SET' || node.type === 'COMPONENT') &&
+      node.name.trim() === masterName
   )
-  graph.updateNode(master.id, { pluginData: [...rest, entry] })
-  console.log(`правила записаны: ${master.id} "${master.name.trim()}"`)
+  if (!masters.length) {
+    console.error(`мастер "${masterName}" не найден`)
+    continue
+  }
+  for (const master of masters) {
+    const entry = {
+      pluginId: PLUGIN_ID,
+      key: RULES_KEY,
+      value: JSON.stringify(rules)
+    }
+    const rest = master.pluginData.filter(
+      (item) => !(item.pluginId === PLUGIN_ID && item.key === RULES_KEY)
+    )
+    graph.updateNode(master.id, { pluginData: [...rest, entry] })
+    console.log(`правила записаны: ${master.id} "${master.name.trim()}"`)
+    written += 1
+  }
 }
 
 if (listOnly) {
-  console.log(JSON.stringify(ICON_RULES, null, 2))
+  for (const [name, rules] of Object.entries(RULES_BY_MASTER)) {
+    console.log(`\n=== ${name} ===`)
+    console.log(JSON.stringify(rules, null, 2))
+  }
   process.exit(0)
+}
+
+if (written === 0) {
+  console.error('ничего не записано')
+  process.exit(1)
 }
 
 releaseOriginalFigArchive(graph)
