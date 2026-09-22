@@ -94,25 +94,40 @@ export const getPageTree = defineTool({
 export const getNode = defineTool({
   name: 'get_node',
   description:
-    'Get detailed properties of a node by ID. Use depth to limit child recursion (0 = node only, 1 = direct children, etc). Default: unlimited.',
+    'Get detailed properties of a node by ID. Children are limited to two levels by default: a component set may hold hundreds of variants, and reading them all buries the useful answer. Ask for a deeper `depth` only when the structure below really matters.',
   execution: { kind: 'sync', mutation: 'none' },
   input: v.object({
     id: nodeIdInput,
     depth: v.optional(
       toolNumber(
-        v.pipe(
-          v.number(),
-          v.description('Max depth of children to include (0 = no children). Default: unlimited')
-        )
+        v.pipe(v.number(), v.description('Max depth of children to include (0 = no children). Default: 2'))
       )
     )
   }),
   execute: (figma, { id, depth }) => {
     const node = figma.getNodeById(id)
     if (!node) return { error: `Node "${id}" not found` }
-    return nodeToResult(node, depth)
+    // Сет вроде button держит 900 вариантов: чтение всего дерева раздувает
+    // ответ до сотен тысяч знаков и съедает контекст за один шаг. Предел
+    // в два уровня показывает строение, но не выкладывает все копии.
+    const result = nodeToResult(node, depth ?? DEFAULT_NODE_DEPTH)
+    const raw = figma.graph.getNode(id)
+    const variants = raw?.childIds.length ?? 0
+    if (variants > VARIANT_WARNING_THRESHOLD) {
+      return {
+        ...result,
+        note: `Children shown to depth ${depth ?? DEFAULT_NODE_DEPTH}. This node holds ${variants} children — pass depth for more, or search variants instead of reading them all.`
+      }
+    }
+    return result
   }
 })
+
+/** Предел вложенности по умолчанию: строение видно, копии вариантов — нет. */
+const DEFAULT_NODE_DEPTH = 2
+
+/** С этого числа детей предупреждаем, что ответ урезан. */
+const VARIANT_WARNING_THRESHOLD = 40
 
 export const findNodes = defineTool({
   name: 'find_nodes',

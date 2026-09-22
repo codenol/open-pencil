@@ -2,6 +2,15 @@ import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
 import type { NodeProxyHost } from './proxy'
 
+/**
+ * Сколько детей показывать у крупного узла.
+ *
+ * Компонентный сет держит десятки и сотни вариантов. Полный список не нужен:
+ * ассистенту важно строение и возможности, а не все копии. Остаток сообщаем
+ * числом, чтобы он мог спросить конкретное, если понадобится.
+ */
+const CHILDREN_LIMIT = 24
+
 function resolveBindings(graph: SceneGraph, node: SceneNode): Record<string, unknown> | undefined {
   const keys = Object.keys(node.boundVariables)
   if (keys.length === 0) return undefined
@@ -74,6 +83,18 @@ export function nodeProxyToJSON(
   if (children.length > 0) {
     if (maxDepth !== undefined && currentDepth >= maxDepth) {
       obj.childCount = children.length
+    } else if (children.length > CHILDREN_LIMIT) {
+      // Сет вроде button держит 900 вариантов: их полный разбор — это сотни
+      // килобайт в ответ, и контекст забивается за один шаг. Отдаём первые
+      // варианты и говорим, сколько осталось.
+      obj.children = children
+        .slice(0, CHILDREN_LIMIT)
+        .map((child) => api.wrapNode(child.id).toJSON(maxDepth, currentDepth + 1))
+      obj.childCount = children.length
+      obj.childrenShown = CHILDREN_LIMIT
+      obj.note =
+        `Shown the first ${CHILDREN_LIMIT} of ${children.length} children. ` +
+        'For a component set use the variant list from get_components instead of reading each one: the names carry the properties, and one variant can be read by id if its structure matters.'
     } else {
       obj.children = children.map((child) =>
         api.wrapNode(child.id).toJSON(maxDepth, currentDepth + 1)
