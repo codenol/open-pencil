@@ -1,5 +1,6 @@
 import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
+import { childSlots, readSlot, SLOT_HINT } from '#core/tools/slots'
 import type { NodeProxyHost } from './proxy'
 
 /**
@@ -108,8 +109,18 @@ export function nodeProxyToJSON(
   }
   if (insideInstance) {
     obj.insideInstance = true
-    obj.editable = 'Override inside an instance: children can be added and changed, the component link stays.'
+    obj.editable =
+      'Existing children of an instance keep their overrides (text, fills, properties). ' +
+      'New nodes added here are not saved — build a component and swap instead.'
   }
+  // Пометка слота из pluginData: любой контейнер с ней наполняется готовым
+  // блоком, а не узлами напрямую. Разметку ставит tools/ds/mark-slots.mjs.
+  if (readSlot(n)) {
+    obj.slot = true
+    if (n.childIds.length === 0) obj.slotHint = SLOT_HINT
+  }
+  const slots = childSlots(graph, nodeId)
+  if (slots.length > 0) obj.slots = slots
   return obj
 }
 
