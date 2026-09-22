@@ -17,7 +17,7 @@ export function useProfileModelSelection(
   ai: Readonly<Ref<ModelPickerLabels & { customModel: string }>>
 ) {
   const CUSTOM_MODEL_VALUE = '__custom__'
-  const DEFAULT_MAX_OUTPUT_TOKENS = 16384
+  const DEFAULT_MAX_OUTPUT_TOKENS = 32768
   const customModelSelected = ref(
     Boolean(draft.customModelID.trim()) || draft.providerID === 'harness:pi'
   )
