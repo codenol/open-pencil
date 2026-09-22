@@ -372,7 +372,12 @@ function serializeLayoutProps(node: SceneNode, nc: KiwiNodeChange, graph: SceneG
     nc.stackWrap = figLayout.stackWrap
     nc.stackPositioning = figLayout.stackPositioning
     nc.stackChildPrimaryGrow = figLayout.stackChildPrimaryGrow
-    nc.stackChildAlignSelf = figLayout.stackChildAlignSelf
+    // Растягивание берётся из текущего состояния, а не из сохранённого
+    // в файле: после вставки ячейки в колонку оно меняется, и сохранённое
+    // значение перебивало правку. Это тот же класс, что и сохранённая
+    // геометрия: файл помнит прошлое, а не то, что сделали сейчас.
+    nc.stackChildAlignSelf =
+      node.layoutAlignSelf !== 'AUTO' ? node.layoutAlignSelf : figLayout.stackChildAlignSelf
     nc.stackCounterSpacing = figLayout.stackCounterSpacing
     nc.bordersTakeSpace = figLayout.bordersTakeSpace
     if (figLayout.stackReverseZIndex) nc.stackReverseZIndex = true
