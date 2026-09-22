@@ -51,6 +51,24 @@ export const fillSlot = defineTool({
       }
     }
 
+    // Слот внутри инстанса: наполнение не сохранится. Говорим сразу и прямо,
+    // иначе работа пропадёт после закрытия документа.
+    const scope = slotScopeOf(figma.graph, slot.id)
+    if (scope === 'instance') {
+      return {
+        error:
+          `Slot "${slot.name.trim()}" (${slot.id}) sits inside an instance. A block placed there shows on the canvas and is not written to the file. ` +
+          'Fill the same slot in the master instead — the master component is the one this instance points at.',
+        slotScope: scope
+      }
+    }
+    if (scope === 'page') {
+      return {
+        error: `Node "${slot.id}" is not inside a component or instance, so there is no master to fill. Place the block directly if this is your own layout.`,
+        slotScope: scope
+      }
+    }
+
     const target = resolveTarget(figma.graph, args.component_id, args.variant_values)
     if ('error' in target) return target
 
@@ -116,6 +134,22 @@ export const fillSlot = defineTool({
     }
   }
 })
+
+/** Где лежит узел: в мастере, в инстансе или на странице. */
+function slotScopeOf(
+  graph: { getNode: (id: string) => { parentId?: string | null; type: string } | undefined },
+  nodeId: string
+): 'master' | 'instance' | 'page' {
+  let current = graph.getNode(nodeId)
+  while (current?.parentId) {
+    const parent = graph.getNode(current.parentId)
+    if (!parent) break
+    if (parent.type === 'COMPONENT' || parent.type === 'COMPONENT_SET') return 'master'
+    if (parent.type === 'INSTANCE') return 'instance'
+    current = parent
+  }
+  return 'page'
+}
 
 /** Компонент для вставки: сам узел или вариант из сета. */
 function resolveTarget(
