@@ -86,6 +86,11 @@ export const fillSlot = defineTool({
       }
     }
 
+    // Заливка слота — служебная плашка. С блоком она видна поверх него, поэтому
+    // снимаем: место слота остаётся, а плашка уходит.
+    const clearsFill = Array.isArray(slot.fills) && slot.fills.length > 0
+    if (clearsFill) figma.graph.updateNode(slot.id, { fills: [] })
+
     const instance = figma.graph.createInstance(target.id, slot.id)
     if (!instance) return { error: `Failed to place "${target.name.trim()}" into the slot` }
 
@@ -106,7 +111,8 @@ export const fillSlot = defineTool({
       componentName: target.name.trim(),
       ...(existing.length > 0 ? { replaced: existing } : {}),
       ...(removed.length > 0 ? { removed } : {}),
-      note: 'The block is in place as an instance: it saves with the file, and the master stays unchanged.'
+      ...(clearsFill ? { clearedSlotFill: true } : {}),
+      note: 'The block is in place as an instance inside the slot: it saves with the file, the slot stays for the next block, and the master is unchanged.'
     }
   }
 })
