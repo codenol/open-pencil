@@ -153,10 +153,39 @@ export function createToolLoopTransport({
       agent,
       onError: (error) => {
         onError?.(error)
-        return 'The provider rejected the request.'
+        // Разбираем, что именно ответил провайдер. Общая фраза уводит в сторону:
+        // ассистент видит отказ, решает, что дело в его JSX, и правит то, что
+        // не сломано. Чаще всего отказ приходит на слишком большой запрос.
+        const detail = describeProviderError(error)
+        return detail
       }
     }) as ChatTransport<UIMessage>
   )
+}
+
+/**
+ * Переводит отказ провайдера в понятную фразу.
+ *
+ * Провайдеры отвечают по-разному: размер запроса, лимит частоты, ключ, модель.
+ * Без разбора ассистент считает любой отказ ошибкой своего кода и начинает
+ * править рабочий JSX — мы это уже видели.
+ */
+export function describeProviderError(error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error ?? '')
+  const lower = text.toLowerCase()
+  if (/context|token|too large|length|payload/.test(lower)) {
+    return `The provider refused the request: it is too large — likely the accumulated context. Report this to the user and stop; do not retry the same call or change the JSX. Detail: ${text.slice(0, 200)}`
+  }
+  if (/rate|429|quota|limit/.test(lower)) {
+    return `The provider refused the request: rate or quota limit. Wait and retry once. Detail: ${text.slice(0, 200)}`
+  }
+  if (/auth|key|401|403|forbidden/.test(lower)) {
+    return `The provider refused the request: credentials. Ask the user to check the model settings. Detail: ${text.slice(0, 200)}`
+  }
+  if (/model|404/.test(lower)) {
+    return `The provider refused the request: the model may be unavailable. Ask the user to check the model settings. Detail: ${text.slice(0, 200)}`
+  }
+  return `The provider refused the request. Do not change your JSX because of this. Detail: ${text.slice(0, 200)}`
 }
 
 export function createChatSessionManager({
