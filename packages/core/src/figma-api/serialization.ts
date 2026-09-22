@@ -117,11 +117,33 @@ export function nodeProxyToJSON(
   // блоком, а не узлами напрямую. Разметку ставит tools/ds/mark-slots.mjs.
   if (readSlot(n)) {
     obj.slot = true
-    if (n.childIds.length === 0) obj.slotHint = SLOT_HINT
+    // Где слот: в мастере или в рабочей копии. Без этого ассистент путался,
+    // какой узел он видит, и уходил править мастер вместо своей страницы.
+    const scope = slotScopeOf(graph, nodeId)
+    obj.slotScope = scope
+    if (n.childIds.length === 0) {
+      obj.slotHint =
+        scope === 'master'
+          ? `${SLOT_HINT} This one is in the master, so filling it changes the library for everyone.`
+          : `${SLOT_HINT} This one is in a working copy: fill it the same way, and keep the master as it is.`
+    }
   }
   const slots = childSlots(graph, nodeId)
   if (slots.length > 0) obj.slots = slots
   return obj
+}
+
+/** Где лежит узел с этой меткой: в мастере, в инстансе или на странице. */
+function slotScopeOf(graph: SceneGraph, nodeId: string): 'master' | 'instance' | 'page' {
+  let current = graph.getNode(nodeId)
+  while (current?.parentId) {
+    const parent = graph.getNode(current.parentId)
+    if (!parent) break
+    if (parent.type === 'COMPONENT' || parent.type === 'COMPONENT_SET') return 'master'
+    if (parent.type === 'INSTANCE') return 'instance'
+    current = parent
+  }
+  return 'page'
 }
 
 /** Лежит ли узел внутри инстанса (сам инстанс не считается). */
