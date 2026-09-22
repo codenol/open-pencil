@@ -150,5 +150,8 @@
   "jumpToLatest": "К последнему сообщению",
   "maxAgentStepsCustom": "Своё значение…",
   "assistantWorking": "Ассистент работает…",
-  "workingOn": "Работает: {tool}"
+  "workingOn": "Работает: {tool}",
+  "generating": "Время с момента отправки",
+  "lastRunTime": "Сколько заняла последняя работа",
+  "took": "заняло"
 }
