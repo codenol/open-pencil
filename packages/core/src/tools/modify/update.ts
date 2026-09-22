@@ -2,8 +2,9 @@ import * as v from 'valibot'
 
 import type { SceneNode } from '@open-pencil/scene-graph'
 
-import { estimateTextSize } from '#core/layout'
+import { computeAllLayouts, estimateTextSize } from '#core/layout'
 import { assertNodeEditable } from '#core/editor/capabilities'
+import { layoutScope } from '#core/tools/modify/text'
 import { toolNumber, nodeIdInput } from '#core/tools/input'
 import { defineTool, nodeNotFound } from '#core/tools/schema'
 
@@ -94,6 +95,10 @@ export const updateNode = defineTool({
         const sizeUpdate: Partial<SceneNode> = { height: measured.height }
         if (textNode.textAutoResize === 'WIDTH_AND_HEIGHT') sizeUpdate.width = measured.width
         figma.graph.updateNode(node.id, sizeUpdate)
+        // Размеры вокруг текста считает раскладка: без запуска ширина
+        // «по содержимому» у бейджа или кнопки остаётся прежней.
+        const scope = layoutScope(figma.graph, node.id)
+        if (scope) computeAllLayouts(figma.graph, scope)
         updated.push('size')
       }
     }

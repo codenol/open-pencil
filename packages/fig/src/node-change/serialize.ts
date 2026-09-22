@@ -363,9 +363,16 @@ function serializeLayoutProps(node: SceneNode, nc: KiwiNodeChange, graph: SceneG
     nc.stackPrimaryAlignItems = normalizeStackJustify(figLayout.stackPrimaryAlignItems)
     // For imported nodes, figLayout captures the original kiwi NC values.
     // Preserve omitted sizing fields instead of materializing schema defaults.
-    const stackPrimarySizing = normalizeStackSizing(figLayout.stackPrimarySizing)
+    // Размер по осям берётся из текущего состояния, а не из сохранённого:
+    // ширина «по содержимому» включается после правки, и сохранённое
+    // значение её перебивало — бейдж не тянулся под новую подпись.
+    const stackPrimarySizing = normalizeStackSizing(
+      node.primaryAxisSizing === 'HUG' ? 'RESIZE_TO_FIT' : figLayout.stackPrimarySizing
+    )
     if (stackPrimarySizing) nc.stackPrimarySizing = stackPrimarySizing
-    const stackCounterSizing = normalizeStackSizing(figLayout.stackCounterSizing)
+    const stackCounterSizing = normalizeStackSizing(
+      node.counterAxisSizing === 'HUG' ? 'RESIZE_TO_FIT' : figLayout.stackCounterSizing
+    )
     if (stackCounterSizing) nc.stackCounterSizing = stackCounterSizing
     nc.stackVerticalPadding = figLayout.stackVerticalPadding
     nc.stackHorizontalPadding = figLayout.stackHorizontalPadding
