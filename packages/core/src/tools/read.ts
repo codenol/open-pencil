@@ -1,3 +1,4 @@
+export { listIcons } from './read/icons'
 export { getComponents } from './read/components'
 export { getDefaultVariant, insertLibraryComponent, listLibraries } from './read/libraries'
 export { getFontStatus, listAvailableFonts, listFonts } from './read/fonts'
