@@ -6,7 +6,7 @@ import { parseColor } from '#core/color'
 import { styleToWeight } from '#core/text/fonts'
 import { applyStyleToRange } from '#core/text/style-runs'
 import { toolNumber, nodeIdInput } from '#core/tools/input'
-import { estimateTextSize } from '#core/layout'
+import { computeAllLayouts, estimateTextSize } from '#core/layout'
 import { defineTool, nodeNotFound } from '#core/tools/schema'
 
 export const setText = defineTool({
@@ -33,6 +33,11 @@ export const setText = defineTool({
         }
       }
       figma.graph.updateNode(target.id, { text, ...autoResizePatch(target, text) })
+      // Текст изменился — размеры вокруг него надо пересчитать. Без этого
+      // бейдж или кнопка с шириной «по содержимому» остаются прежними:
+      // HUG не срабатывает, потому что раскладку никто не запускал.
+      const scope = layoutScope(figma.graph, target.id)
+      if (scope) computeAllLayouts(figma.graph, scope)
       return { id: target.id, instanceId: id, text }
     }
 
@@ -40,6 +45,8 @@ export const setText = defineTool({
       return { error: `Node "${id}" is ${raw.type}, not a text node or instance` }
     }
     figma.graph.updateNode(id, { text, ...autoResizePatch(raw, text) })
+    const scope = layoutScope(figma.graph, id)
+    if (scope) computeAllLayouts(figma.graph, scope)
     return { id, text }
   }
 })
@@ -156,6 +163,16 @@ export const setTextResize = defineTool({
     return { id, textAutoResize: mode, ...sized }
   }
 })
+
+/** Ближайший предок с раскладкой: его и пересчитываем. */
+export function layoutScope(graph: SceneGraph, nodeId: string): string | null {
+  let current = graph.getNode(nodeId)?.parentId ? graph.getNode(graph.getNode(nodeId)!.parentId!) : null
+  while (current) {
+    if (current.layoutMode !== 'NONE') return current.id
+    current = current.parentId ? graph.getNode(current.parentId) : undefined
+  }
+  return null
+}
 
 /**
  * Приводит размер текста в соответствие с режимом.
