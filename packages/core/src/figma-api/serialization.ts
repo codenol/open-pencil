@@ -101,5 +101,21 @@ export function nodeProxyToJSON(
       )
     }
   }
+  if (insideInstance) {
+    obj.insideInstance = true
+    obj.editable = 'Override inside an instance: children can be added and changed, the component link stays.'
+  }
   return obj
+}
+
+/** Лежит ли узел внутри инстанса (сам инстанс не считается). */
+function isInsideInstance(graph: SceneGraph, node: { parentId: string | null }): boolean {
+  let parentId = node.parentId
+  while (parentId) {
+    const parent = graph.getNode(parentId)
+    if (!parent) return false
+    if (parent.type === 'INSTANCE') return true
+    parentId = parent.parentId
+  }
+  return false
 }
