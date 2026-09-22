@@ -25,8 +25,26 @@ class RunState {
     this.maxSteps = resolveAgentStepLimit(maxSteps)
   }
 
+  /**
+   * Прогон закончился сам, а не был доведён до конца.
+   *
+   * Ставится, когда поток оборвался: браузер усыпил вкладку, провайдер
+   * отказал, вкладку закрыли. Работа при этом сделана наполовину, и её надо
+   * уметь продолжить — иначе ассистент «остановился и дальше не идёт», а
+   * кнопка продолжения не показывается, потому что лимит шагов не достигнут.
+   */
+  unfinished = false
+
   hitLimit(): boolean {
     return this.currentSteps >= this.maxSteps
+  }
+
+  markUnfinished(value: boolean): void {
+    this.unfinished = value
+  }
+
+  isUnfinished(): boolean {
+    return this.unfinished
   }
 }
 
@@ -51,6 +69,15 @@ export function resetRunSteps(store: EditorStore, maxSteps: number): void {
 
 export function didHitStepLimit(store?: EditorStore): boolean {
   return getRunState(store).hitLimit()
+}
+
+/** Прогон оборвался, не дойдя до конца — работу можно продолжить. */
+export function didRunStopEarly(store?: EditorStore): boolean {
+  return getRunState(store).isUnfinished()
+}
+
+export function markRunUnfinished(value: boolean, store?: EditorStore): void {
+  getRunState(store).markUnfinished(value)
 }
 
 export function createAITools(store: EditorStore, diagnosticContext?: AIDiagnosticContext) {
