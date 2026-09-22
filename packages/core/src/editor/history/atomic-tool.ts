@@ -9,6 +9,22 @@ import type { Editor } from '#core/editor/create'
 import type { FigmaAPI } from '#core/figma-api'
 import { isAtomicTool, type ToolDef } from '#core/tools/schema'
 
+/**
+ * Безопасная копия значения.
+ *
+ * `structuredClone` падает на символах, а в свойствах узлов встречаются
+ * служебные значения вроде `Symbol(mixed)`. Копируем что можно, остальное
+ * переносим по ссылке — для отката этого достаточно.
+ */
+function safeClone<T>(value: T): T {
+  if (value === null || typeof value !== 'object') return value
+  try {
+    return structuredClone(value)
+  } catch {
+    return value
+  }
+}
+
 /** Снимок узла: какие свойства были до правки. */
 type ScopedChange = { id: string; before: Partial<SceneNode>; after: Partial<SceneNode> }
 
@@ -81,7 +97,7 @@ export function executeAtomicTool(
             Reflect.deleteProperty(node, key)
           }
         }
-        Object.assign(node, structuredClone(values))
+        Object.assign(node, safeClone(values))
       }
     })
     layout(

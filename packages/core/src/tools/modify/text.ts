@@ -1,11 +1,12 @@
 import * as v from 'valibot'
 
-import type { CharacterStyleOverride, SceneNode } from '@open-pencil/scene-graph'
+import type { CharacterStyleOverride, SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
 import { parseColor } from '#core/color'
 import { styleToWeight } from '#core/text/fonts'
 import { applyStyleToRange } from '#core/text/style-runs'
 import { toolNumber, nodeIdInput } from '#core/tools/input'
+import { estimateTextSize } from '#core/layout'
 import { defineTool, nodeNotFound } from '#core/tools/schema'
 
 export const setText = defineTool({
@@ -18,12 +19,55 @@ export const setText = defineTool({
     text: v.pipe(v.string(), v.description('Text content'))
   }),
   execute: (figma, { id, text }) => {
-    const node = figma.getNodeById(id)
-    if (!node) return { error: `Node "${id}" not found` }
-    node.characters = text
+    const raw = figma.graph.getNode(id)
+    if (!raw) return { error: `Node "${id}" not found` }
+
+    // У инстанса текст живёт в дочернем узле, а не в нём самом: запись в сам
+    // экземпляр проходит, но её никто не рисует — выглядит как успех, а на
+    // деле ничего не меняется. Поэтому сами находим текстовый узел внутри.
+    if (raw.type === 'INSTANCE') {
+      const target = firstTextNode(figma.graph, raw.id)
+      if (!target) {
+        return {
+          error: `Instance "${id}" has no text node inside — nothing to set. Put a label into a component that has one, or use a component whose text you can change.`
+        }
+      }
+      figma.graph.updateNode(target.id, { text, ...autoResizePatch(target, text) })
+      return { id: target.id, instanceId: id, text }
+    }
+
+    if (raw.type !== 'TEXT') {
+      return { error: `Node "${id}" is ${raw.type}, not a text node or instance` }
+    }
+    figma.graph.updateNode(id, { text, ...autoResizePatch(raw, text) })
     return { id, text }
   }
 })
+
+/** Первый текстовый узел внутри поддерева. */
+function firstTextNode(graph: SceneGraph, rootId: string): SceneNode | null {
+  const queue = [rootId]
+  while (queue.length > 0) {
+    const id = queue.shift()
+    if (id === undefined) break
+    for (const childId of graph.getNode(id)?.childIds ?? []) {
+      const child = graph.getNode(childId)
+      if (!child) continue
+      if (child.type === 'TEXT') return child
+      queue.push(childId)
+    }
+  }
+  return null
+}
+
+/** Размер текста после смены содержимого. */
+function autoResizePatch(node: SceneNode, text: string): Partial<SceneNode> {
+  if (node.textAutoResize === 'NONE' || node.textAutoResize === 'TRUNCATE') return {}
+  const measured = estimateTextSize({ ...node, text }, node.textAutoResize === 'HEIGHT' ? node.width : undefined)
+  return node.textAutoResize === 'HEIGHT'
+    ? { height: measured.height }
+    : { width: measured.width, height: measured.height }
+}
 
 export const setFont = defineTool({
   name: 'set_font',
