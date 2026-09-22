@@ -87,24 +87,33 @@ export function hasSameCopySource(left: object, right: object): boolean {
   return (internalCopySources.get(left) ?? left) === (internalCopySources.get(right) ?? right)
 }
 
-export function copyFills(fills: Fill[]): Fill[] {
-  return fills.map(copyFill)
+/**
+ * Копирование списков свойств.
+ *
+ * Список может прийти пустым или отсутствовать: узел, собранный в скрипте,
+ * не обязан нести все поля. Без проверки вызов падает на «cannot read
+ * properties of undefined (reading 'map')» — и рвёт операцию, в которой
+ * копировался инстанс.
+ */
+export function copyFills(fills: Fill[] | undefined): Fill[] {
+  return Array.isArray(fills) ? fills.map(copyFill) : []
 }
 
-export function copyStrokes(strokes: Stroke[]): Stroke[] {
-  return strokes.map(copyStroke)
+export function copyStrokes(strokes: Stroke[] | undefined): Stroke[] {
+  return Array.isArray(strokes) ? strokes.map(copyStroke) : []
 }
 
-export function copyEffects(effects: Effect[]): Effect[] {
-  return effects.map(copyEffect)
+export function copyEffects(effects: Effect[] | undefined): Effect[] {
+  return Array.isArray(effects) ? effects.map(copyEffect) : []
 }
 
-export function copyLayoutGrids(grids: LayoutGrid[]): LayoutGrid[] {
+export function copyLayoutGrids(grids: LayoutGrid[] | undefined): LayoutGrid[] {
+  if (!Array.isArray(grids)) return []
   return grids.map((grid) => ({ ...grid, color: grid.color ? { ...grid.color } : undefined }))
 }
 
-export function copyStyleRuns(runs: StyleRun[]): StyleRun[] {
-  return runs.map(copyStyleRun)
+export function copyStyleRuns(runs: StyleRun[] | undefined): StyleRun[] {
+  return Array.isArray(runs) ? runs.map(copyStyleRun) : []
 }
 
 /** Keep path-level fills across copy/scale/transform (resize snapshots). */
