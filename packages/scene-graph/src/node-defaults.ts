@@ -97,7 +97,10 @@ export function createDefaultNode(
     strokeGeometry: [],
     arcData: null,
     textAlignVertical: 'TOP',
-    textAutoResize: 'NONE',
+    // Новый текст подстраивает размер под содержимое. С 'NONE' ширина
+    // оставалась стартовой (100), и вся раскладка вокруг текста разъезжалась:
+    // чипы, ячейки, колонки получали неверные размеры.
+    textAutoResize: type === 'TEXT' ? 'WIDTH_AND_HEIGHT' : 'NONE',
     textCase: 'ORIGINAL',
     textDecoration: 'NONE',
     textDecorationStyle: 'SOLID',
