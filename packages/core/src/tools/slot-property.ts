@@ -1,29 +1,24 @@
 /**
  * Слот как свойство компонента.
  *
- * В Figma место под содержимое — это не просто фрейм с пометкой, а свойство
+ * В Figma место под содержимое — не просто фрейм с пометкой, а свойство
  * компонента типа `SLOT` (в файле — `ComponentPropType.SLOT`, значение 7),
- * на которое фрейм ссылается через поле `ComponentPropNodeField.SLOT_CONTENT_ID`.
+ * на которое фрейм ссылается полем `ComponentPropNodeField.SLOT_CONTENT_ID`.
  *
- * Разница видна на практике. Фрейм, который мы просто пометили в pluginData,
- * формату неизвестен: положишь в него блок, он покажется на канвасе и пропадёт
- * при сохранении — дети инстанса в файл не пишутся. А настоящее свойство-место
- * делает содержимое значением свойства, и оно переживает перезапись.
+ * Разница видна на практике. Фрейм, помеченный только в pluginData, формату
+ * неизвестен: положишь в него блок — он покажется на канвасе и пропадёт при
+ * сохранении. А настоящее свойство-место делает содержимое значением свойства,
+ * и оно переживает перезапись.
  *
- * Эта функция доводит уже помеченный фрейм до настоящего места: заводит
- * свойство в ближайшем компоненте-владельце и привязывает фрейм к нему.
+ * Важная тонкость: свойство живёт у **слота мастера**, а не у того, что в
+ * рабочей копии. Слот внутри инстанса знает своего мастера через `componentId`
+ * — по этой связи и находим, где заводить свойство. Правку в самом инстансе
+ * файл не сохранит.
  */
 
 import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
-/**
- * Владелец свойств для узла.
- *
- * Свойства живут в компоненте. Но пользователь работает с рабочей копией —
- * узлом внутри инстанса, — поэтому по пути вверх встретится INSTANCE, а не
- * COMPONENT. В этом случае владельцем считается компонент, на который этот
- * инстанс ссылается: свойство заводим там, иначе место не станет настоящим.
- */
+/** Ближайший владелец свойств: компонент или набор вариантов. */
 function ownerComponent(graph: SceneGraph, node: SceneNode): SceneNode | null {
   let current: SceneNode | undefined = node
   const visited = new Set<string>()
@@ -33,7 +28,7 @@ function ownerComponent(graph: SceneGraph, node: SceneNode): SceneNode | null {
     if (parent.type === 'COMPONENT' || parent.type === 'COMPONENT_SET') return parent
     if (parent.type === 'INSTANCE' && parent.componentId && !visited.has(parent.componentId)) {
       visited.add(parent.componentId)
-      const master: SceneNode | undefined = graph.getNode(parent.componentId)
+      const master = graph.getNode(parent.componentId)
       if (master?.type === 'COMPONENT' || master?.type === 'COMPONENT_SET') return master
     }
     current = parent
@@ -42,46 +37,73 @@ function ownerComponent(graph: SceneGraph, node: SceneNode): SceneNode | null {
 }
 
 /**
+ * Узел мастера, которому принадлежит место.
+ *
+ * Слот внутри инстанса — это копия слота мастера, и `componentId` указывает
+ * прямо на неё. Если узел уже в мастере, он и есть искомый.
+ */
+function masterSlot(graph: SceneGraph, node: SceneNode): SceneNode {
+  if (!node.componentId || node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return node
+  const master = graph.getNode(node.componentId)
+  if (!master) return node
+  // Слот инстанса ссылается на фрейм мастера; если это компонент-владелец,
+  // значит связи нет и работаем с самим узлом.
+  if (master.type === 'COMPONENT' || master.type === 'COMPONENT_SET') return node
+  return master
+}
+
+export interface SlotPropertyResult {
+  /** Узел, который стал настоящим местом. */
+  slotId: string
+  propertyId: string
+  ownerId: string
+  created: boolean
+  /** Куда смотрит место: узел в мастере или в рабочей копии. */
+  scope: 'master' | 'instance'
+}
+
+/**
  * Делает узел настоящим местом-слотом.
  *
- * Возвращает описание того, что сделано, либо null, если узел уже место или
- * владельца свойств рядом нет.
+ * Возвращает описание того, что сделано, либо null, если владельца свойств
+ * рядом нет.
  */
-export function ensureSlotProperty(
-  graph: SceneGraph,
-  nodeId: string
-): { propertyId: string; ownerId: string; created: boolean } | null {
-  const node = graph.getNode(nodeId)
-  if (!node) return null
+export function ensureSlotProperty(graph: SceneGraph, nodeId: string): SlotPropertyResult | null {
+  const found = graph.getNode(nodeId)
+  if (!found) return null
+
+  const target = masterSlot(graph, found)
+  const scope: 'master' | 'instance' = target.id === found.id ? 'master' : 'instance'
 
   // Уже настоящий слот — второй раз не заводим.
-  if ((node.componentPropertyReferences ?? []).some((ref) => ref.field === 'SLOT')) {
-    const existing = (node.componentPropertyReferences ?? []).find((ref) => ref.field === 'SLOT')
-    return existing ? { propertyId: existing.propertyId, ownerId: '', created: false } : null
-  }
-
-  const owner = ownerComponent(graph, node)
-  if (!owner) return null
-
-  const definitions = owner.componentPropertyDefinitions ?? []
-  if (definitions.some((definition) => definition.type === 'SLOT' && definition.name === node.name.trim())) {
-    const found = definitions.find(
-      (definition) => definition.type === 'SLOT' && definition.name === node.name.trim()
-    )
-    if (found) {
-      graph.updateNode(node.id, {
-        componentPropertyReferences: [
-          ...(node.componentPropertyReferences ?? []),
-          { propertyId: found.id, field: 'SLOT' }
-        ]
-      })
-      return { propertyId: found.id, ownerId: owner.id, created: false }
+  const existingRef = (target.componentPropertyReferences ?? []).find((ref) => ref.field === 'SLOT')
+  if (existingRef) {
+    return {
+      slotId: target.id,
+      propertyId: existingRef.propertyId,
+      ownerId: '',
+      created: false,
+      scope
     }
   }
 
-  // Свойство называется по фрейму: имена вида «Main content», «Slot», «Menu slot».
-  const name = node.name.trim() || 'Slot'
-  const base = `slot_${node.id.replace(/[^a-zA-Z0-9]/g, '_')}`
+  const owner = ownerComponent(graph, target)
+  if (!owner) return null
+
+  const definitions = owner.componentPropertyDefinitions ?? []
+  const name = target.name.trim() || 'Slot'
+  const sameName = definitions.find((definition) => definition.type === 'SLOT' && definition.name === name)
+  if (sameName) {
+    graph.updateNode(target.id, {
+      componentPropertyReferences: [
+        ...(target.componentPropertyReferences ?? []),
+        { propertyId: sameName.id, field: 'SLOT' }
+      ]
+    })
+    return { slotId: target.id, propertyId: sameName.id, ownerId: owner.id, created: false, scope }
+  }
+
+  const base = `slot_${target.id.replace(/[^a-zA-Z0-9]/g, '_')}`
   let propertyId = base
   let suffix = 2
   const taken = new Set(definitions.map((definition) => definition.id))
@@ -93,12 +115,12 @@ export function ensureSlotProperty(
       { id: propertyId, name, type: 'SLOT', defaultValue: '' }
     ]
   })
-  graph.updateNode(node.id, {
+  graph.updateNode(target.id, {
     componentPropertyReferences: [
-      ...(node.componentPropertyReferences ?? []),
+      ...(target.componentPropertyReferences ?? []),
       { propertyId, field: 'SLOT' }
     ]
   })
 
-  return { propertyId, ownerId: owner.id, created: true }
+  return { slotId: target.id, propertyId, ownerId: owner.id, created: true, scope }
 }
