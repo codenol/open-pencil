@@ -4,6 +4,7 @@ import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
 import { nodeIdInput } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
+import { releaseOriginalFigArchive } from '#core/kiwi/fig/session/original-archive'
 
 /**
  * Замена компонента у экземпляра — «swap», как в Figma.
@@ -45,6 +46,10 @@ export const swapComponent = defineTool({
 
     const previousName = instance.name
     figma.graph.swapInstanceComponent(args.id, resolved.componentId)
+    // Своп меняет ссылку узла на компонент, а экспорт отдаёт исходный архив
+    // файла, пока тот считается годным. Без сброса своп живёт до перезагрузки:
+    // на канвасе видно, в файл не попадает.
+    releaseOriginalFigArchive(figma.graph)
 
     const updated = figma.graph.getNode(args.id)
     return {

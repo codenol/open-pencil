@@ -354,7 +354,11 @@ export function swapInstanceComponent(
 ): void {
   const instance = graph.nodes.get(instanceId)
   const component = graph.nodes.get(componentId)
-  if (!instance || component?.type !== 'COMPONENT' || instance.type !== 'INSTANCE') return
+  if (!instance || component?.type !== 'COMPONENT') return
+  // Слот внутри инстанса — это FRAME, привязанный к своему узлу в мастере
+  // через componentId. Своп слота на компонент — такая же замена ссылки, как
+  // своп инстанса, и без неё содержимое слота не переживает сохранение.
+  if (instance.type !== 'INSTANCE' && !instance.componentId) return
 
   const previousComponent = instance.componentId ? graph.nodes.get(instance.componentId) : undefined
   const updates: Partial<SceneNode> = { componentId }
@@ -363,7 +367,10 @@ export function swapInstanceComponent(
     copyProp(updates, component, key)
   }
 
-  if (!previousComponent || instance.name === previousComponent.name) updates.name = component.name
+  const isPlainInstance = instance.type === 'INSTANCE'
+  if (isPlainInstance && (!previousComponent || instance.name === previousComponent.name)) {
+    updates.name = component.name
+  }
 
   const childIds = Array.from(instance.childIds)
   for (const childId of childIds) graph.deleteNode(childId)

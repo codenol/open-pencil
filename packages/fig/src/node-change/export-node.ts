@@ -13,6 +13,7 @@ import { effectiveFigmaRawNodeFields, effectiveFigmaSourcePayload } from '../sou
 /* eslint-disable max-lines */
 import { bytesToHex } from './bytes'
 import { exportCanvasGuides } from './canvas-guides'
+import { appendSlotSwaps } from './slot-swaps'
 import {
   applyExportSettingsPluginData,
   applyLibrarySourcePluginData,
@@ -136,9 +137,55 @@ function createStrokePaints(context: SceneNodeToKiwiContext, node: SceneNode): P
   )
 }
 
+/**
+ * Имя типа свойства для файла.
+ *
+ * Формат знает и имена, и номера перечислителя `ComponentPropType`, но
+ * имена читаемее и переживают добавление новых значений. `SLOT` пишем как
+ * есть: именно он делает содержимое места сохраняемым.
+ */
 function componentPropertyTypeForKiwi(type: string) {
   if (type === 'BOOLEAN') return 'BOOL'
   return type
+}
+
+/** Что записать в свойства-места: ограничения по числу и предпочтения. */
+function componentPropertySlotSettings(
+  def: { type: string; slotSettings?: { minChildren?: number; maxChildren?: number; preferredValues?: string[]; allowPreferredValuesOnly?: boolean } },
+  context: SceneNodeToKiwiContext,
+  localIdCounter: { value: number }
+) {
+  if (def.type !== 'SLOT' || !def.slotSettings) return undefined
+  const settings = def.slotSettings
+  const preferred = settings.preferredValues
+    ?.map((value) => {
+      const target = context.graph.getNode(value)
+      const guid = target ? getOrCreateNodeGuid(context, target.id, localIdCounter) : parseGuidOrNull(value)
+      return guid ? { guidValue: guid } : null
+    })
+    .filter((value): value is { guidValue: GUID } => value !== null)
+  return {
+    minChildren: settings.minChildren,
+    maxChildren: settings.maxChildren,
+    preferredValues: preferred?.length ? { instanceSwapValues: preferred } : undefined,
+    allowPreferredValuesOnly: settings.allowPreferredValuesOnly
+  }
+}
+
+/**
+ * Значение свойства-места по умолчанию.
+ *
+ * Формат держит в `varValue` указатель на содержимое: пока в место ничего не
+ * положили, это пустая ссылка (4294967295 — минус единица в беззнаковом виде).
+ * Без этого поля свойство не считается настоящим и место не открывается для
+ * правок в инстансе.
+ */
+function componentPropertySlotVarValue() {
+  return {
+    value: { slotContentIdValue: { guid: { sessionID: 4294967295, localID: 4294967295 } } },
+    dataType: 'SLOT_CONTENT_ID',
+    resolvedDataType: 'SLOT_CONTENT_ID'
+  }
 }
 
 function componentPropertyValue(
@@ -148,6 +195,8 @@ function componentPropertyValue(
   localIdCounter: { value: number }
 ) {
   if (type === 'BOOLEAN') return { boolValue: value === 'true' }
+  // У свойства-места начального значения нет: содержимое задаётся в инстансе.
+  if (type === 'SLOT') return {}
   if (type === 'INSTANCE_SWAP') {
     const target = context.graph.getNode(value)
     const guid = target
@@ -630,7 +679,12 @@ function applyInstancePayload(
   nc: KiwiNodeChange,
   localIdCounter: { value: number }
 ): void {
-  if (node.type !== 'INSTANCE' || !node.componentId) return
+  // Слот внутри инстанса — это FRAME, привязанный к своему узлу в мастере через
+  // componentId. Он такой же носитель ссылки, как INSTANCE: после свопа слота
+  // на компонент блока именно эта ссылка и должна уехать в файл. Без неё своп
+  // живёт до перезагрузки и пропадает — работа теряется молча.
+  const carriesComponentLink = node.type === 'INSTANCE' || Boolean(node.componentId)
+  if (!carriesComponentLink || !node.componentId) return
   const symbolID = getOrCreateNodeGuid(
     context,
     resolveInstanceComponentId(context, node.componentId),
@@ -650,6 +704,38 @@ function applyInstancePayload(
     }
     mergeOverrides(symbolOverrides, serializeTextOverrides(context, node, localIdCounter))
     mergeOverrides(symbolOverrides, serializeFillOverrides(context, node, localIdCounter))
+    // Свопы слотов: слот на рабочей странице указывает на другой компонент, чем
+    // в мастере. Без этой записи содержимое слота пропадает при сохранении —
+    // дети инстанса в файл не пишутся, и работа теряется молча.
+    const swappedSlots = appendSlotSwaps(
+      {
+        graph: {
+          getNode: (id) => {
+            const found = context.graph.getNode(id)
+            return found
+              ? {
+                  id: found.id,
+                  type: found.type,
+                  name: found.name,
+                  componentId: found.type === 'INSTANCE' ? found.componentId : null
+                }
+              : undefined
+          },
+          getChildren: (id) =>
+            context.graph.getChildren(id).map((child) => ({
+              id: child.id,
+              type: child.type,
+              name: child.name,
+              componentId: child.type === 'INSTANCE' ? child.componentId : null
+            }))
+        },
+        nodeIdToGuid: context.nodeIdToGuid,
+        resolveComponentId: (id) => resolveInstanceComponentId(context, id)
+      },
+      node.id,
+      symbolOverrides
+    )
+    if (swappedSlots > 0) symbolOverrides.push(...[])
     if (symbolOverrides.length > 0) symbolData.symbolOverrides = symbolOverrides
     if (node.source.fig.uniformScaleFactor != null) {
       symbolData.uniformScaleFactor = node.source.fig.uniformScaleFactor
@@ -708,6 +794,8 @@ function componentPropertyPreferredValues(
 function componentPropertyNodeField(field: ComponentPropertyReferenceField): string {
   if (field === 'TEXT') return 'TEXT_DATA'
   if (field === 'INSTANCE_SWAP') return 'OVERRIDDEN_SYMBOL_ID'
+  // У места своё имя поля: фрейм-место привязан к свойству через SLOT_CONTENT_ID.
+  if (field === 'SLOT') return 'SLOT_CONTENT_ID'
   return 'VISIBLE'
 }
 
@@ -757,7 +845,15 @@ function applyComponentMetadata(
     name: def.name,
     type: componentPropertyTypeForKiwi(def.type),
     initialValue: componentPropertyValue(def.type, def.defaultValue, context, localIdCounter),
-    preferredValues: componentPropertyPreferredValues(def, context)
+    preferredValues: componentPropertyPreferredValues(def, context),
+    slotSettings: componentPropertySlotSettings(def, context, localIdCounter),
+    ...(def.type === 'SLOT'
+      ? {
+          sortPosition: '"',
+          varValue: componentPropertySlotVarValue(),
+          description: ''
+        }
+      : {})
   }))
   if (shouldSerializeRawBackedField(node, 'componentPropDefs', componentPropDefs.length > 0)) {
     nc.componentPropDefs = componentPropDefs
