@@ -580,9 +580,28 @@ export interface SceneNode {
   textPathBox: Rect | null
 }
 
-export type ComponentPropertyType = 'VARIANT' | 'TEXT' | 'BOOLEAN' | 'INSTANCE_SWAP'
+/**
+ * Типы свойств компонента.
+ *
+ * Значения повторяют перечисление из формата файла (`ComponentPropType`):
+ * BOOL 0, TEXT 1, COLOR 2, INSTANCE_SWAP 3, VARIANT 4, NUMBER 5, IMAGE 6,
+ * SLOT 7. Держим здесь те, что умеем проводить через файл и интерфейс.
+ *
+ * `SLOT` — свойство-место: фрейм внутри мастера, содержимое которого можно
+ * свободно менять в инстансе, не отвязывая его. Именно оно делает такие
+ * правки сохраняемыми: в файл уходит не узел, а значение свойства.
+ */
+export type ComponentPropertyType =
+  | 'VARIANT'
+  | 'TEXT'
+  | 'BOOLEAN'
+  | 'INSTANCE_SWAP'
+  | 'SLOT'
+  | 'NUMBER'
+  | 'COLOR'
+  | 'IMAGE'
 
-export type ComponentPropertyReferenceField = 'VISIBLE' | 'TEXT' | 'INSTANCE_SWAP'
+export type ComponentPropertyReferenceField = 'VISIBLE' | 'TEXT' | 'INSTANCE_SWAP' | 'SLOT'
 
 export interface ComponentPropertyReference {
   propertyId: string
@@ -596,6 +615,16 @@ export interface ComponentPropertyDefinition {
   defaultValue: string
   variantOptions?: string[]
   preferredValues?: string[]
+  /**
+   * Ограничения свойства-места: сколько узлов можно положить и есть ли
+   * предпочтительные. Взято из `slotSettings` формата; у старых файлов пусто.
+   */
+  slotSettings?: {
+    minChildren?: number
+    maxChildren?: number
+    preferredValues?: string[]
+    allowPreferredValuesOnly?: boolean
+  }
 }
 
 export type VariableType = 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN'

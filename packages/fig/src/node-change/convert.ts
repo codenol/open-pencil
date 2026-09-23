@@ -697,12 +697,32 @@ export function nodeChangeToProps(
   return props
 }
 
+/**
+ * Тип свойства компонента: имя из файла и его номер.
+ *
+ * Один и тот же перечислитель приходит и строкой, и числом — смотря как
+ * записан файл. Номера взяты из схемы документа (`ComponentPropType`):
+ * BOOL 0, TEXT 1, COLOR 2, INSTANCE_SWAP 3, VARIANT 4, NUMBER 5, IMAGE 6,
+ * SLOT 7.
+ */
 const COMPONENT_PROP_TYPE_MAP: Record<string, ComponentPropertyType> = {
   VARIANT: 'VARIANT',
   TEXT: 'TEXT',
   BOOL: 'BOOLEAN',
   BOOLEAN: 'BOOLEAN',
-  INSTANCE_SWAP: 'INSTANCE_SWAP'
+  INSTANCE_SWAP: 'INSTANCE_SWAP',
+  SLOT: 'SLOT',
+  NUMBER: 'NUMBER',
+  IMAGE: 'IMAGE',
+  COLOR: 'COLOR',
+  '0': 'BOOLEAN',
+  '1': 'TEXT',
+  '2': 'COLOR',
+  '3': 'INSTANCE_SWAP',
+  '4': 'VARIANT',
+  '5': 'NUMBER',
+  '6': 'IMAGE',
+  '7': 'SLOT'
 }
 
 function componentPropValueToString(value: unknown): string {
@@ -779,6 +799,19 @@ function extractComponentPropertyDefs(nc: NodeChange): ComponentPropertyDefiniti
           ? def.preferredValues?.instanceSwapValues
               ?.map((value) => value.key)
               .filter((value): value is string => value !== undefined)
+          : undefined,
+      // Свойство-место может ограничивать число узлов внутри: сколько минимум,
+      // сколько максимум и есть ли предпочтительные. Старые файлы поля не несут.
+      slotSettings:
+        propType === 'SLOT' && def.slotSettings
+          ? {
+              minChildren: def.slotSettings.minChildren,
+              maxChildren: def.slotSettings.maxChildren,
+              preferredValues: def.slotSettings.preferredValues?.instanceSwapValues
+                ?.map((value) => value.key)
+                .filter((value): value is string => value !== undefined),
+              allowPreferredValuesOnly: def.slotSettings.allowPreferredValuesOnly
+            }
           : undefined
     })
   }
@@ -792,9 +825,14 @@ function extractComponentPropertyRefs(nc: NodeChange): ComponentPropertyReferenc
     '0': 'VISIBLE',
     '1': 'TEXT',
     '2': 'INSTANCE_SWAP',
+    '3': 'SLOT',
+    '4': 'SLOT',
     VISIBLE: 'VISIBLE',
     TEXT_DATA: 'TEXT',
-    OVERRIDDEN_SYMBOL_ID: 'INSTANCE_SWAP'
+    OVERRIDDEN_SYMBOL_ID: 'INSTANCE_SWAP',
+    INHERIT_FILL_STYLE_ID: 'SLOT',
+    // Фрейм-место в мастере привязан к свойству через это поле.
+    SLOT_CONTENT_ID: 'SLOT'
   }
   return refs.flatMap((ref) => {
     const field = fieldMap[String(ref.componentPropNodeField)]

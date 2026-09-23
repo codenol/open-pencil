@@ -2,6 +2,8 @@ import * as v from 'valibot'
 
 import { nodeIdInput } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
+import { releaseOriginalFigArchive } from '#core/kiwi/fig/session/original-archive'
+import { ensureSlotProperty } from '#core/tools/slot-property'
 import { readSlot } from '#core/tools/slots'
 
 /**
@@ -104,6 +106,11 @@ export const fillSlot = defineTool({
       }
     }
 
+    // Пометки мало: чтобы содержимое пережило сохранение, место должно быть
+    // свойством компонента. Доводим помеченный фрейм до настоящего слота —
+    // заводим свойство типа SLOT у владельца и привязываем фрейм к нему.
+    const slotProperty = ensureSlotProperty(figma.graph, slot.id)
+
     // Заливка слота — служебная плашка. С блоком она видна поверх него, поэтому
     // снимаем: место слота остаётся, а плашка уходит.
     const clearsFill = Array.isArray(slot.fills) && slot.fills.length > 0
@@ -122,6 +129,11 @@ export const fillSlot = defineTool({
       }
     }
 
+    // Правка узлов внутри инстанса не переживает сохранение, но сам факт
+    // изменения делает исходный архив негодным: без сброса экспорт вернёт
+    // старый файл целиком.
+    releaseOriginalFigArchive(figma.graph)
+
     return {
       slot: slot.id,
       placed: instance.id,
@@ -130,7 +142,10 @@ export const fillSlot = defineTool({
       ...(existing.length > 0 ? { replaced: existing } : {}),
       ...(removed.length > 0 ? { removed } : {}),
       ...(clearsFill ? { clearedSlotFill: true } : {}),
-      note: 'The block is in place as an instance inside the slot: it saves with the file, the slot stays for the next block, and the master is unchanged.'
+      ...(slotProperty ? { slotProperty: slotProperty.propertyId, slotIsReal: true } : {}),
+      note: slotProperty
+        ? 'The block is in place as an instance inside a real slot property: it saves with the file, the slot stays for the next block, and the master layout is unchanged.'
+        : 'The block is in place as an instance inside the slot. Warning: the slot is not backed by a SLOT component property, so the content may not survive saving.'
     }
   }
 })
