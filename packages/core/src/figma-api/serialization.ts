@@ -109,9 +109,15 @@ export function nodeProxyToJSON(
   }
   if (insideInstance) {
     obj.insideInstance = true
+    // Раньше здесь стоял запрет: «новые узлы не сохранятся». Он устарел и
+    // работал во вред: ассистент читал его, решал, что действовать нельзя, и
+    // останавливался, ничего не сделав. Теперь правки уводятся в мастер сами,
+    // поэтому вместо запрета — что именно произойдёт.
     obj.editable =
       'Existing children of an instance keep their overrides (text, fills, properties). ' +
-      'New nodes added here are not saved — build a component and swap instead.'
+      'New nodes added straight into an instance are not written to the file. ' +
+      'This is handled for you: a container marked as a place goes to its master ' +
+      'and the content is saved there — just render or fill as usual.'
   }
   // Пометка слота из pluginData: любой контейнер с ней наполняется готовым
   // блоком, а не узлами напрямую. Разметку ставит tools/ds/mark-slots.mjs.

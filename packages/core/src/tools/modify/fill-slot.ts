@@ -53,17 +53,11 @@ export const fillSlot = defineTool({
       }
     }
 
-    // Слот внутри инстанса: наполнение не сохранится. Говорим сразу и прямо,
-    // иначе работа пропадёт после закрытия документа.
+    // Раньше слот внутри инстанса отвергался: «наполнение не сохранится».
+    // Теперь это не так — ниже место доводится до настоящего и содержимое
+    // уходит в мастера. Отказ только мешал: ассистент видел ошибку и бросал
+    // задачу, хотя всё нужное для неё уже есть.
     const scope = slotScopeOf(figma.graph, slot.id)
-    if (scope === 'instance') {
-      return {
-        error:
-          `Slot "${slot.name.trim()}" (${slot.id}) sits inside an instance. A block placed there shows on the canvas and is not written to the file. ` +
-          'Fill the same slot in the master instead — the master component is the one this instance points at.',
-        slotScope: scope
-      }
-    }
     if (scope === 'page') {
       return {
         error: `Node "${slot.id}" is not inside a component or instance, so there is no master to fill. Place the block directly if this is your own layout.`,
