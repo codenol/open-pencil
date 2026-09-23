@@ -124,12 +124,16 @@ function isInstanceSlotCandidate(node: {
   type: string
   componentId?: string | null
   pluginData?: { key: string; value: string }[]
+  name?: string
 }): boolean {
   if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return false
-  if (node.type !== 'INSTANCE' && !node.componentId) return false
-  const marked = (node.pluginData ?? []).some((entry) => entry.key === 'slot')
+  // Место внутри копии видно по трём признакам, и достаточно любого: ссылка на
+  // свойство, пометка в pluginData, имя. Пометку ставит разметка файла, и она
+  // не всегда доезжает до сохранённого документа — на неё одну полагаться
+  // нельзя, иначе рисунок уходит в копию и пропадает.
   const linked = (node.componentPropertyReferences ?? []).some((ref) => ref.field === 'SLOT')
-  if (!marked && !linked) return false
-  // Настоящий слот живёт в мастере — там и правим, копию не трогаем.
+  const marked = (node.pluginData ?? []).some((entry) => entry.key === 'slot')
+  const named = /slot/i.test((node.name ?? '').trim()) || /^main container$/i.test((node.name ?? '').trim())
+  if (!linked && !marked && !named) return false
   return Boolean(node.componentId) || linked
 }
