@@ -210,6 +210,18 @@ export function createChatSessionManager({
     activeProviderError ??= error
   }
 
+  /**
+   * Снимает запомненный отказ провайдера.
+   *
+   * Вызывается перед новым шагом: иначе отказ, случившийся один раз, остаётся
+   * в памяти и подменяет текст всех последующих ошибок. Мы это видели: вызов
+   * `eval` с `1+1` «падал» с сообщением про `figma`, к которому отношения не
+   * имел.
+   */
+  function forgetProviderError(): void {
+    activeProviderError = null
+  }
+
   function handleChatFinish(
     context: AIDiagnosticContext,
     {
@@ -341,12 +353,18 @@ export function createChatSessionManager({
         transport: {
           sendMessages: (options) => {
             diagnosticContext.runId = crypto.randomUUID()
+            forgetProviderError()
             return transport.sendMessages(options)
           },
           reconnectToStream: (options) => transport.reconnectToStream(options)
         },
         messages,
         onError: (error) => {
+          // Отказ провайдера, пойманый транспортом, точнее того, что приходит
+          // сюда. Но он относится только к текущему шагу: если сбросить его
+          // негде, он подменяет собой все следующие ошибки — и тогда падение
+          // обычного вызова показывает чужой текст. Оставляем его только пока
+          // он свежий.
           const reportedError = activeProviderError ?? error
           activeProviderError = null
           failure.value = classifyAIChatError(reportedError)
