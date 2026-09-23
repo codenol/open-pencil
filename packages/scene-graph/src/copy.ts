@@ -244,10 +244,21 @@ export function cloneNodeProps(
 ): Partial<SceneNode> {
   const { id: _, parentId: _p, childIds: _c, ...rest } = src
   if (mode === 'fig-import') {
+    // Копия запоминает, откуда она родом.
+    //
+    // Без этого источника нет, и номер копии выдаётся по порядку обхода: узел
+    // рабочей копии называется по-разному при каждом открытии документа, а
+    // инструменты зовут его по id, добытому шагом раньше. Обращение уходит в
+    // чужой узел, и правка пропадает. Запоминаем источник, чтобы номер копии
+    // можно было вывести из образца и он не менялся.
+    const inherited = createDefaultSourceMetadata()
+    if (src.source?.format) inherited.format = src.source.format
+    if (src.source?.id) inherited.id = src.source.id
+    inherited.orderKey = inherited.id ? `${inherited.id}.instance` : null
     return {
       ...rest,
       ...(componentId !== null ? { componentId } : {}),
-      source: createDefaultSourceMetadata(),
+      source: inherited,
       boundVariables: { ...src.boundVariables },
       variableModes: { ...src.variableModes },
       instanceOverrides: cloneInstanceOverrideState(src.instanceOverrides),

@@ -134,7 +134,12 @@ export class SceneGraph {
 
     this.addPage('Page 1')
   }
-  addPage(name: string): SceneNode {
+  addPage(name: string, id?: string): SceneNode {
+    // Страница тоже может получить номер из файла — иначе её id меняется при
+    // каждом открытии документа, а на неё ссылаются узлы и заметки.
+    if (id && !this.nodes.has(id)) {
+      return this.createNodeWithId(id, 'CANVAS', this.rootId, { name, width: 0, height: 0 })
+    }
     return this.createNode('CANVAS', this.rootId, { name, width: 0, height: 0 })
   }
 

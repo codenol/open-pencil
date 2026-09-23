@@ -120,7 +120,18 @@ function cloneChildrenWithMapping(
     const src = graph.nodes.get(childId)
     if (!src) continue
 
-    const clone = graph.createNode(src.type, destParentId, cloneNodeProps(src, childId, mode))
+    // Копия получает предсказуемый id, выведенный из узла-образца.
+    //
+    // Иначе каждый разбор документа выдаёт копиям новые номера по порядку
+    // обхода, и один и тот же узел в рабочей копии называется по-разному при
+    // каждом открытии. Инструменты же обращаются по id, полученному шагом
+    // раньше: обращение уходит в чужой узел, и правка пропадает. Считаем
+    // производный номер — он один и тот же для одного и того же образца.
+    const derivedId = derivedInstanceChildId(destParentId, childId)
+    const clone =
+      derivedId && !graph.nodes.has(derivedId)
+        ? graph.createNodeWithId(derivedId, src.type, destParentId, cloneNodeProps(src, childId, mode))
+        : graph.createNode(src.type, destParentId, cloneNodeProps(src, childId, mode))
 
     if (src.childIds.length > 0) {
       cloneChildrenWithMapping(graph, childId, clone.id, mode)
@@ -274,7 +285,13 @@ function syncChildren(
     if (!instChildMap.has(compChildId)) {
       const src = graph.nodes.get(compChildId)
       if (!src) continue
-      const clone = graph.createNode(src.type, instParentId, cloneNodeProps(src, compChildId))
+      // Тот же предсказуемый номер, что и в первом проходе: иначе копия,
+      // достроенная этим путём, снова получает новый id при каждом разборе.
+      const derivedChildId = derivedInstanceChildId(instParentId, compChildId)
+      const clone =
+        derivedChildId && !graph.nodes.has(derivedChildId)
+          ? graph.createNodeWithId(derivedChildId, src.type, instParentId, cloneNodeProps(src, compChildId))
+          : graph.createNode(src.type, instParentId, cloneNodeProps(src, compChildId))
       if (src.childIds.length > 0) {
         cloneChildrenWithMapping(graph, compChildId, clone.id)
       }
@@ -484,4 +501,41 @@ export function recordInstanceOverride(
   for (const field of relevant)
     setInstanceOverride(instance.instanceOverrides, instance.id, nodeId, field)
   graph.updateNode(instance.id, { instanceOverrides: instance.instanceOverrides })
+}
+
+/**
+ * Смещение рабочей части номера копии.
+ *
+ * Обычные номера из файла не дотягивают до этого значения, производные — выше.
+ */
+const INSTANCE_CHILD_ID_OFFSET = 4_000_000_000
+
+/**
+ * Номер копии, выведенный из узла-образца и места, куда её кладут.
+ *
+ * Номер не пересекается с номерами из файла и остаётся тем же при каждом
+ * разборе документа, а значит узел рабочей копии сохраняет одно имя между
+ * открытиями. Родитель входит в расчёт обязательно: один и тот же образец
+ * копируется в разные инстансы, и без родителя вторая копия не получила бы
+ * номер — он оказался бы занят первой.
+ */
+function derivedInstanceChildId(parentId: string, sourceId: string): string | null {
+  const [, parentLocal] = parentId.split(':')
+  const [session, local] = sourceId.split(':')
+  if (session === undefined || local === undefined || parentLocal === undefined) return null
+  const sessionNumber = Number(session)
+  const localNumber = Number(local)
+  const parentNumber = Number(parentLocal)
+  if (!Number.isFinite(sessionNumber) || !Number.isFinite(localNumber) || !Number.isFinite(parentNumber)) {
+    return null
+  }
+  // Номер собирается из двух частей, каждая со своим смещением, и остаётся
+  // целым. Держим его в пределах точности чисел: узел уже унаследовал
+  // производный номер от своего родителя, и простым умножением он вылез бы за
+  // этот предел — тогда номер теряет разряды и перестаёт быть предсказуемым.
+  const localBase = localNumber % INSTANCE_CHILD_ID_OFFSET
+  const parentBase = parentNumber % INSTANCE_CHILD_ID_OFFSET
+  const assembled =
+    INSTANCE_CHILD_ID_OFFSET * 2 + (parentBase % INSTANCE_CHILD_ID_OFFSET) * 2 + (localBase % 2)
+  return `${sessionNumber}:${assembled}`
 }
