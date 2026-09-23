@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { ensureSlotProperty } from '#core/tools/slot-property'
 
 import { toolNumber } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
@@ -38,16 +39,20 @@ export const render = defineTool({
     let replaceIndex = -1
 
     // Рисовать прямо в место рабочей копии бессмысленно: узлы внутри инстанса
-    // в файл не пишутся, и работа пропадает при сохранении. Слот инстанса
-    // знает своего мастера через componentId — уводим правку туда и говорим
-    // об этом, чтобы автор не считал, будто нарисовал в выделенном узле.
+    // в файл не пишутся, и работа пропадает при сохранении.
+    //
+    // Место может быть ещё не настоящим — помеченным, но без свойства типа
+    // SLOT. Тогда сначала доводим его до настоящего, а затем уводим правку в
+    // мастера: иначе рисунок уедет в копию и пропадёт.
     let redirectedTo: string | null = null
     const parentNode = figma.graph.getNode(parentId)
-    if (parentNode && isInstanceSlot(parentNode)) {
-      const master = masterSlotOf(figma.graph, parentNode)
-      if (master) {
-        parentId = master.id
-        redirectedTo = master.id
+    if (parentNode && isInstanceSlotCandidate(parentNode)) {
+      const slotProperty = ensureSlotProperty(figma.graph, parentNode.id)
+      const targetSlotId = slotProperty?.slotId ?? parentNode.id
+      const targetNode = figma.graph.getNode(targetSlotId)
+      if (targetNode && targetNode.id !== parentNode.id) {
+        parentId = targetNode.id
+        redirectedTo = targetNode.id
       }
     }
 
@@ -107,20 +112,24 @@ export const render = defineTool({
   }
 })
 
-/** Место ли это внутри рабочей копии — по ссылке на свойство. */
-function isInstanceSlot(node: { componentPropertyReferences?: { field: string }[]; type: string }): boolean {
-  if (!(node.componentPropertyReferences ?? []).some((ref) => ref.field === 'SLOT')) return false
-  return node.type !== 'COMPONENT' && node.type !== 'COMPONENT_SET'
-}
-
-/** Двойник места в мастере: слот копии ссылается на него через componentId. */
-function masterSlotOf(
-  graph: { getNode: (id: string) => { id: string; type: string; componentId?: string | null } | undefined },
-  slot: { componentId?: string | null }
-): { id: string } | null {
-  if (!slot.componentId) return null
-  const master = graph.getNode(slot.componentId)
-  if (!master) return null
-  if (master.type === 'COMPONENT' || master.type === 'COMPONENT_SET') return null
-  return { id: master.id }
+/**
+ * Узел внутри рабочей копии, который может быть местом под содержимое.
+ *
+ * Настоящий слот виден по ссылке на свойство. Но место бывает и помеченным,
+ * без свойства — тогда его сначала надо довести до настоящего, и уже потом
+ * решать, куда рисовать. Узел самого компонента владельцем не считается.
+ */
+function isInstanceSlotCandidate(node: {
+  componentPropertyReferences?: { field: string }[]
+  type: string
+  componentId?: string | null
+  pluginData?: { key: string; value: string }[]
+}): boolean {
+  if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return false
+  if (node.type !== 'INSTANCE' && !node.componentId) return false
+  const marked = (node.pluginData ?? []).some((entry) => entry.key === 'slot')
+  const linked = (node.componentPropertyReferences ?? []).some((ref) => ref.field === 'SLOT')
+  if (!marked && !linked) return false
+  // Настоящий слот живёт в мастере — там и правим, копию не трогаем.
+  return Boolean(node.componentId) || linked
 }
