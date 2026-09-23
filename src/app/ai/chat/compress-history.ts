@@ -35,6 +35,14 @@ export const KEEP_FULL_MESSAGES = 6
  */
 const SHRUNK_LIMIT = 400
 
+/**
+ * Предел для ответа инструмента в свежем хвосте.
+ *
+ * Больше, чем у старых шагов: свежий ответ ещё нужен для работы. Но и он не
+ * может быть любого размера, иначе хвост перевешивает всю историю.
+ */
+const TAIL_LIMIT = 4000
+
 function shrinkText(text: string): string {
   if (text.length <= SHRUNK_LIMIT) return text
   return `${text.slice(0, SHRUNK_LIMIT)}… [сокращено, шаг уже выполнен]`
@@ -78,5 +86,32 @@ export function compressStepHistory(
     head.push({ ...message, content } as ModelMessage)
   }
 
-  return [...head, ...messages.slice(boundary)]
+  // Хвост тоже подрезаем — мягче и только очень крупные ответы.
+  //
+  // Иначе задача на полсотни шагов копится сотнями килобайт: свежие ответы
+  // инструментов самые тяжёлые (осмотр узла — до семнадцати килобайт), и
+  // несколько таких в хвосте весят больше, чем вся остальная история.
+  // Провайдер отвечает отказом, и работа встаёт на ровном месте.
+  const tail = messages.slice(boundary).map((message) => {
+    if (typeof message.content === 'string') {
+      if (message.content.length <= TAIL_LIMIT) return message
+      return { ...message, content: `${message.content.slice(0, TAIL_LIMIT)}… [сокращено]` } as ModelMessage
+    }
+    if (!Array.isArray(message.content)) return message
+    return {
+      ...message,
+      content: message.content.map((part) =>
+        part.type === 'tool-result' &&
+        part.output?.type === 'text' &&
+        part.output.value.length > TAIL_LIMIT
+          ? {
+              ...part,
+              output: { ...part.output, value: `${part.output.value.slice(0, TAIL_LIMIT)}… [сокращено]` }
+            }
+          : part
+      )
+    } as ModelMessage
+  })
+
+  return [...head, ...tail]
 }

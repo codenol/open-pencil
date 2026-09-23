@@ -24,7 +24,8 @@ export function hitTestGuides(
   let closest: GuideHit | null = null
 
   const visit = (owner: SceneNode) => {
-    for (const guide of owner.guides) {
+    // Направляющих может не быть: узел, собранный скриптом, это поле не несёт.
+    for (const guide of owner.guides ?? []) {
       const distance = distanceToGuideSegment(
         x,
         y,
