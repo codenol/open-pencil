@@ -37,6 +37,20 @@ export const render = defineTool({
     let parentId = args.parent_id ?? figma.currentPageId
     let replaceIndex = -1
 
+    // Рисовать прямо в место рабочей копии бессмысленно: узлы внутри инстанса
+    // в файл не пишутся, и работа пропадает при сохранении. Слот инстанса
+    // знает своего мастера через componentId — уводим правку туда и говорим
+    // об этом, чтобы автор не считал, будто нарисовал в выделенном узле.
+    let redirectedTo: string | null = null
+    const parentNode = figma.graph.getNode(parentId)
+    if (parentNode && isInstanceSlot(parentNode)) {
+      const master = masterSlotOf(figma.graph, parentNode)
+      if (master) {
+        parentId = master.id
+        redirectedTo = master.id
+      }
+    }
+
     if (args.replace_id) {
       const target = figma.graph.getNode(args.replace_id)
       if (target?.parentId) {
@@ -69,11 +83,19 @@ export const render = defineTool({
       children: string[]
       warnings?: typeof result.warnings
       siblings?: Array<{ id: string; name: string; type: string }>
+      redirectedTo?: string
+      note?: string
     } = {
       id: result.id,
       name: result.name,
       type: result.type,
-      children: result.childIds
+      children: result.childIds,
+      ...(redirectedTo
+        ? {
+            redirectedTo,
+            note: `You asked to draw into a slot of a working copy. That content would not be saved, so it went into the same slot of the master instead — you will see it once the copy refreshes. Use fill_slot when the block already exists as a component.`
+          }
+        : {})
     }
     if (result.warnings) response.warnings = result.warnings
     if (results.length > 1) {
@@ -84,3 +106,21 @@ export const render = defineTool({
     return response
   }
 })
+
+/** Место ли это внутри рабочей копии — по ссылке на свойство. */
+function isInstanceSlot(node: { componentPropertyReferences?: { field: string }[]; type: string }): boolean {
+  if (!(node.componentPropertyReferences ?? []).some((ref) => ref.field === 'SLOT')) return false
+  return node.type !== 'COMPONENT' && node.type !== 'COMPONENT_SET'
+}
+
+/** Двойник места в мастере: слот копии ссылается на него через componentId. */
+function masterSlotOf(
+  graph: { getNode: (id: string) => { id: string; type: string; componentId?: string | null } | undefined },
+  slot: { componentId?: string | null }
+): { id: string } | null {
+  if (!slot.componentId) return null
+  const master = graph.getNode(slot.componentId)
+  if (!master) return null
+  if (master.type === 'COMPONENT' || master.type === 'COMPONENT_SET') return null
+  return { id: master.id }
+}
