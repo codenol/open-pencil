@@ -88,7 +88,8 @@ export function drawGuides(
 
   r.auxStroke.setStrokeWidth(1)
   const visit = (owner: SceneNode) => {
-    for (const guide of owner.guides) {
+    // Направляющих может не быть: узел, собранный скриптом, это поле не несёт.
+    for (const guide of owner.guides ?? []) {
       if (preview?.source?.ownerId === owner.id && preview.source.guideId === guide.id) continue
       drawGuide(
         r,
