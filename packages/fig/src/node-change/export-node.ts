@@ -13,7 +13,6 @@ import { effectiveFigmaRawNodeFields, effectiveFigmaSourcePayload } from '../sou
 /* eslint-disable max-lines */
 import { bytesToHex } from './bytes'
 import { exportCanvasGuides } from './canvas-guides'
-import { appendSlotSwaps } from './slot-swaps'
 import {
   applyExportSettingsPluginData,
   applyLibrarySourcePluginData,
@@ -704,38 +703,6 @@ function applyInstancePayload(
     }
     mergeOverrides(symbolOverrides, serializeTextOverrides(context, node, localIdCounter))
     mergeOverrides(symbolOverrides, serializeFillOverrides(context, node, localIdCounter))
-    // Свопы слотов: слот на рабочей странице указывает на другой компонент, чем
-    // в мастере. Без этой записи содержимое слота пропадает при сохранении —
-    // дети инстанса в файл не пишутся, и работа теряется молча.
-    const swappedSlots = appendSlotSwaps(
-      {
-        graph: {
-          getNode: (id) => {
-            const found = context.graph.getNode(id)
-            return found
-              ? {
-                  id: found.id,
-                  type: found.type,
-                  name: found.name,
-                  componentId: found.type === 'INSTANCE' ? found.componentId : null
-                }
-              : undefined
-          },
-          getChildren: (id) =>
-            context.graph.getChildren(id).map((child) => ({
-              id: child.id,
-              type: child.type,
-              name: child.name,
-              componentId: child.type === 'INSTANCE' ? child.componentId : null
-            }))
-        },
-        nodeIdToGuid: context.nodeIdToGuid,
-        resolveComponentId: (id) => resolveInstanceComponentId(context, id)
-      },
-      node.id,
-      symbolOverrides
-    )
-    if (swappedSlots > 0) symbolOverrides.push(...[])
     if (symbolOverrides.length > 0) symbolData.symbolOverrides = symbolOverrides
     if (node.source.fig.uniformScaleFactor != null) {
       symbolData.uniformScaleFactor = node.source.fig.uniformScaleFactor
