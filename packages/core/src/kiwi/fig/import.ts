@@ -351,7 +351,7 @@ function importPages(
       const canvasNc = changeMap.get(canvasId)
       if (!canvasNc) continue
       if (canvasNc.type === 'CANVAS') {
-        const page = graph.addPage(canvasNc.name ?? 'Page')
+        const page = graph.addPage(canvasNc.name ?? 'Page', canvasId)
         page.source.id = canvasId
         applyImportedCanvasMetadata(page, canvasNc)
         canvasIdToPageId.set(canvasId, page.id)
@@ -550,7 +550,17 @@ export function importNodeChanges(
     }
 
     const parentId = canvasIdToPageId.get(graphParentId) ?? graphParentId
-    const node = graph.createNode(nodeType, parentId, props)
+    // Узлы получают тот же id, что записан в файле.
+    //
+    // Иначе id выдаются по порядку обхода, а порядок зависит от карты связей —
+    // и при следующем открытии того же файла узлы получают другие номера.
+    // Инструменты при этом зовут узлы по id, добытому шагом раньше: обращение
+    // уходит в пустоту или в чужой узел, и правка пропадает.
+    const fileId = ncId
+    const taken = graph.nodes.has(fileId)
+    const node = taken
+      ? graph.createNode(nodeType, parentId, props)
+      : graph.createNodeWithId(fileId, nodeType, parentId, props)
     guidToNodeId.set(ncId, node.id)
 
     for (const childId of getChildren(ncId)) {
