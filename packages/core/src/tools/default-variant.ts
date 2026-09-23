@@ -66,7 +66,17 @@ export function resolveDefaultVariant(
   // Это сет: ищем базовый.
   if (node.type === 'COMPONENT_SET') {
     const marked = read(graph, node.id)
-    if (marked) return { ...marked, source: 'marked' }
+    // Пометка хранит номер варианта, а номер может устареть: узлы получают
+    // новые номера при пересборке документа, и записанный прежде номер
+    // начинает указывать на чужой узел — однажды так вернулась иконка вместо
+    // карточки. Поэтому пометку принимаем, только если она ведёт к варианту
+    // этого же сета.
+    if (marked) {
+      const variant = graph.getNode(marked.variantId)
+      if (variant && node.childIds.includes(variant.id)) {
+        return { variantId: variant.id, variantName: variant.name, source: 'marked' }
+      }
+    }
 
     const guesses = [/^state=default/i, /^property 1=default/i, /size=16/i, /^state=hover/i]
     for (const pattern of guesses) {
