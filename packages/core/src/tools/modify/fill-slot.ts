@@ -23,7 +23,7 @@ export const fillSlot = defineTool({
   name: 'fill_slot',
   description:
     'Put a block into a slot. Pass the slot node and the component to place. The block goes in as an instance, so it saves and the master stays unchanged. If the slot is already filled, the current content is reported before it is replaced.',
-  execution: { kind: 'sync', mutation: 'structure' },
+  execution: { kind: 'sync', mutation: 'document' },
   input: v.object({
     id: nodeIdInput,
     component_id: v.pipe(
@@ -109,23 +109,42 @@ export const fillSlot = defineTool({
     // Пометки мало: чтобы содержимое пережило сохранение, место должно быть
     // свойством компонента. Доводим помеченный фрейм до настоящего слота —
     // заводим свойство типа SLOT у владельца и привязываем фрейм к нему.
+    //
+    // Свойство живёт у места в мастере: узел в рабочей копии файл не хранит.
+    // Поэтому если выделен слот внутри инстанса, содержимое кладём в его
+    // мастер-двойник — так Figma и работает, и оно разойдётся по копиям.
     const slotProperty = ensureSlotProperty(figma.graph, slot.id)
+    const targetSlotId = slotProperty?.slotId ?? slot.id
+    if (targetSlotId !== slot.id) {
+      const masterSlot = figma.graph.getNode(targetSlotId)
+      if (!masterSlot) return { error: `Slot master for "${slot.name.trim()}" not found` }
+    }
 
     // Заливка слота — служебная плашка. С блоком она видна поверх него, поэтому
     // снимаем: место слота остаётся, а плашка уходит.
     const clearsFill = Array.isArray(slot.fills) && slot.fills.length > 0
     if (clearsFill) figma.graph.updateNode(slot.id, { fills: [] })
 
-    const instance = figma.graph.createInstance(target.id, slot.id)
+    const instance = figma.graph.createInstance(target.id, targetSlotId)
     if (!instance) return { error: `Failed to place "${target.name.trim()}" into the slot` }
 
     const removed: string[] = []
     if (replace) {
-      for (const child of existing) {
-        // Сам инстанс не трогаем: он только что создан в этом же слоте.
-        if (child.id === instance.id) continue
-        figma.graph.deleteNode(child.id)
-        removed.push(child.id)
+      // Прежнее содержимое ищем в целевом слоте: если наполняли мастер,
+      // там и лежит то, что надо убрать.
+      const inTarget = figma.graph.getNode(targetSlotId)?.childIds ?? []
+      for (const childId of inTarget) {
+        if (childId === instance.id) continue
+        figma.graph.deleteNode(childId)
+        removed.push(childId)
+      }
+      // И в исходном слоте, если это была другая копия.
+      if (targetSlotId !== slot.id) {
+        for (const child of existing) {
+          if (child.id === instance.id) continue
+          figma.graph.deleteNode(child.id)
+          removed.push(child.id)
+        }
       }
     }
 
@@ -135,7 +154,8 @@ export const fillSlot = defineTool({
     releaseOriginalFigArchive(figma.graph)
 
     return {
-      slot: slot.id,
+      slot: targetSlotId,
+      requestedSlot: slot.id,
       placed: instance.id,
       component: target.id,
       componentName: target.name.trim(),
@@ -144,7 +164,9 @@ export const fillSlot = defineTool({
       ...(clearsFill ? { clearedSlotFill: true } : {}),
       ...(slotProperty ? { slotProperty: slotProperty.propertyId, slotIsReal: true } : {}),
       note: slotProperty
-        ? 'The block is in place as an instance inside a real slot property: it saves with the file, the slot stays for the next block, and the master layout is unchanged.'
+        ? slotProperty.scope === 'instance'
+          ? 'The block is in the slot of this master, so every instance of it gets a copy and the content saves with the file. The slot itself stays for the next block. The master layout structure is unchanged.'
+          : 'The block is in place as an instance inside a real slot property: it saves with the file, the slot stays for the next block, and the master layout is unchanged.'
         : 'The block is in place as an instance inside the slot. Warning: the slot is not backed by a SLOT component property, so the content may not survive saving.'
     }
   }
