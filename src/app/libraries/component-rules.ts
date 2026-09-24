@@ -12,6 +12,8 @@ const RULES_KEY = 'component-rules'
 
 export interface ComponentRules {
   purpose?: string
+  /** Порядок сборки: шаги, по которым компонент собирают. */
+  howto?: string[]
   use?: string[]
   avoid?: string[]
   allowed?: string[]
@@ -29,7 +31,7 @@ function parseRules(raw: string): ComponentRules | null {
     if (!parsed || typeof parsed !== 'object') return null
     const rules: ComponentRules = {}
     if (typeof parsed.purpose === 'string') rules.purpose = parsed.purpose
-    for (const key of ['use', 'avoid', 'allowed', 'forbidden', 'checks'] as const) {
+    for (const key of ['howto', 'use', 'avoid', 'allowed', 'forbidden', 'checks'] as const) {
       if (isStringArray(parsed[key])) rules[key] = parsed[key]
     }
     return rules
