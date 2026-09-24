@@ -1,5 +1,10 @@
 import * as v from 'valibot'
+
+import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
+
 import { ensureSlotProperty } from '#core/tools/slot-property'
+import { swapSlotContent } from '#core/tools/modify/swap'
+import type { FigmaAPI } from '#core/figma-api'
 
 import { toolNumber } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
@@ -38,22 +43,19 @@ export const render = defineTool({
     let parentId = args.parent_id ?? figma.currentPageId
     let replaceIndex = -1
 
-    // Рисовать прямо в место рабочей копии бессмысленно: узлы внутри инстанса
-    // в файл не пишутся, и работа пропадает при сохранении.
+    // Место внутри рабочей копии принадлежит экрану: рисуем в саму копию,
+    // а после рисунка доводим его до своего компонента и ставим назначение на
+    // этом экземпляре. Мастер и соседние экраны не меняются.
     //
     // Место может быть ещё не настоящим — помеченным, но без свойства типа
-    // SLOT. Тогда сначала доводим его до настоящего, а затем уводим правку в
-    // мастера: иначе рисунок уедет в копию и пропадёт.
-    let redirectedTo: string | null = null
+    // SLOT. Тогда сначала доводим его до настоящего: назначение ссылается на
+    // свойство владельца.
+    let slotTarget: { node: SceneNode; pageId: string } | null = null
     const parentNode = figma.graph.getNode(parentId)
     if (parentNode && isInstanceSlotCandidate(parentNode)) {
-      const slotProperty = ensureSlotProperty(figma.graph, parentNode.id)
-      const targetSlotId = slotProperty?.slotId ?? parentNode.id
-      const targetNode = figma.graph.getNode(targetSlotId)
-      if (targetNode && targetNode.id !== parentNode.id) {
-        parentId = targetNode.id
-        redirectedTo = targetNode.id
-      }
+      ensureSlotProperty(figma.graph, parentNode.id)
+      const pageId = pageIdOf(figma.graph, parentNode.id)
+      if (pageId) slotTarget = { node: parentNode, pageId }
     }
 
     if (args.replace_id) {
@@ -81,6 +83,8 @@ export const render = defineTool({
       figma.graph.reorderChild(result.id, parentId, args.insert_index)
     }
 
+    const promoted = slotTarget ? promoteIntoSlot(figma, result.id, slotTarget) : null
+
     const response: {
       id: string
       name: string
@@ -88,19 +92,20 @@ export const render = defineTool({
       children: string[]
       warnings?: typeof result.warnings
       siblings?: Array<{ id: string; name: string; type: string }>
-      redirectedTo?: string
+      componentId?: string
+      placedId?: string | null
       note?: string
     } = {
       id: result.id,
       name: result.name,
       type: result.type,
-      children: result.childIds,
-      ...(redirectedTo
-        ? {
-            redirectedTo,
-            note: `You asked to draw into a slot of a working copy. That content would not be saved, so it went into the same slot of the master instead — you will see it once the copy refreshes. Use fill_slot when the block already exists as a component.`
-          }
-        : {})
+      children: result.childIds
+    }
+    if (promoted) {
+      response.componentId = promoted.componentId
+      response.placedId = promoted.placedId
+      response.note =
+        "You drew into a slot of a working copy. The drawing became your own component on the page and is assigned to the slot of this one screen — the master and the other screens keep their slots as they were, and the content saves with the file. Style that component, not the instance."
     }
     if (result.warnings) response.warnings = result.warnings
     if (results.length > 1) {
@@ -136,4 +141,42 @@ function isInstanceSlotCandidate(node: {
   const named = /slot/i.test((node.name ?? '').trim()) || /^main container$/i.test((node.name ?? '').trim())
   if (!linked && !marked && !named) return false
   return Boolean(node.componentId) || linked
+}
+
+/** Страница узла: содержимое места складываем туда, где стоит сам экран. */
+function pageIdOf(graph: SceneGraph, nodeId: string): string | null {
+  let current: SceneNode | undefined = graph.getNode(nodeId)
+  while (current) {
+    if (current.type === 'CANVAS') return current.id
+    current = current.parentId ? graph.getNode(current.parentId) : undefined
+  }
+  return null
+}
+
+/**
+ * Рисунок в месте рабочей копии становится своим компонентом и занимает это
+ * место на одном экране.
+ *
+ * Свободные узлы внутри инстанса в файл не пишутся, поэтому рисунок сначала
+ * выносим на страницу (положение сохраняется), затем делаем из него компонент
+ * и ставим назначение на экземпляре — ровно то, что делает панель свойств.
+ * Мастер при этом не трогается: занято место только этого экрана.
+ */
+function promoteIntoSlot(
+  figma: FigmaAPI,
+  renderedId: string,
+  target: { node: SceneNode; pageId: string }
+): { componentId: string; placedId: string | null } | null {
+  if (!figma.graph.getNode(renderedId)) return null
+  figma.graph.reparentNode(renderedId, target.pageId)
+
+  const rendered = figma.getNodeById(renderedId)
+  if (!rendered) return null
+  const component = figma.createComponentFromNode(rendered)
+
+  const swapped = swapSlotContent(figma.graph, target.node, component.id)
+  if ('error' in swapped) return null
+
+  const placed = swapped.placed
+  return { componentId: component.id, placedId: typeof placed === 'string' ? placed : null }
 }
