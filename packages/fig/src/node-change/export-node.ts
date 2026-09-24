@@ -150,7 +150,15 @@ function componentPropertyTypeForKiwi(type: string) {
 
 /** Что записать в свойства-места: ограничения по числу и предпочтения. */
 function componentPropertySlotSettings(
-  def: { type: string; slotSettings?: { minChildren?: number; maxChildren?: number; preferredValues?: string[]; allowPreferredValuesOnly?: boolean } },
+  def: {
+    type: string
+    slotSettings?: {
+      minChildren?: number
+      maxChildren?: number
+      preferredValues?: string[]
+      allowPreferredValuesOnly?: boolean
+    }
+  },
   context: SceneNodeToKiwiContext,
   localIdCounter: { value: number }
 ) {
@@ -159,7 +167,9 @@ function componentPropertySlotSettings(
   const preferred = settings.preferredValues
     ?.map((value) => {
       const target = context.graph.getNode(value)
-      const guid = target ? getOrCreateNodeGuid(context, target.id, localIdCounter) : parseGuidOrNull(value)
+      const guid = target
+        ? getOrCreateNodeGuid(context, target.id, localIdCounter)
+        : parseGuidOrNull(value)
       return guid ? { guidValue: guid } : null
     })
     .filter((value): value is { guidValue: GUID } => value !== null)
@@ -506,6 +516,33 @@ function overridePathKey(payload: KiwiSymbolOverridePayload): string | null {
     : null
 }
 
+function invalidatedOverrideRootKeys(
+  context: SceneNodeToKiwiContext,
+  instance: SceneNode,
+  localIdCounter: { value: number }
+): Set<string> {
+  const result = new Set<string>()
+  if (!instance.source.editedFields.includes('componentPropertyAssignments')) return result
+  if (!instance.invalidatedOverrideComponentIds) return result
+  for (const componentId of instance.invalidatedOverrideComponentIds) {
+    const rootId = resolveInstanceComponentId(context, componentId)
+    const guid = getOrCreateNodeGuid(context, rootId, localIdCounter)
+    if (guid) result.add(`${guid.sessionID}:${guid.localID}`)
+  }
+  return result
+}
+
+function filterInvalidatedOverrides(
+  overrides: KiwiSymbolOverridePayload[],
+  invalidatedRootKeys: ReadonlySet<string>
+): KiwiSymbolOverridePayload[] {
+  if (invalidatedRootKeys.size === 0) return overrides
+  return overrides.filter((override) => {
+    const root = override.guidPath?.guids?.[0]
+    return !root || !invalidatedRootKeys.has(`${root.sessionID}:${root.localID}`)
+  })
+}
+
 function mergeOverrides(
   symbolOverrides: KiwiSymbolOverridePayload[],
   newOverrides: KiwiSymbolOverridePayload[]
@@ -693,12 +730,16 @@ function applyInstancePayload(
     const symbolData: Record<string, unknown> = { symbolID }
     const symbolOverrides: KiwiSymbolOverridePayload[] = []
     if (node.source.fig.symbolOverrides.length > 0) {
+      const rawOverrides = materializeFigmaPayload(node.source.fig.symbolOverrides, context.blobs, {
+        blobIndexByHex: context.blobIndexByHex,
+        includePaintVariables: true,
+        includeVariableMaps: true
+      }) as KiwiSymbolOverridePayload[]
       symbolOverrides.push(
-        ...(materializeFigmaPayload(node.source.fig.symbolOverrides, context.blobs, {
-          blobIndexByHex: context.blobIndexByHex,
-          includePaintVariables: true,
-          includeVariableMaps: true
-        }) as KiwiSymbolOverridePayload[])
+        ...filterInvalidatedOverrides(
+          rawOverrides,
+          invalidatedOverrideRootKeys(context, node, localIdCounter)
+        )
       )
     }
     mergeOverrides(symbolOverrides, serializeTextOverrides(context, node, localIdCounter))
@@ -807,21 +848,23 @@ function applyComponentMetadata(
   }
   if (node.symbolDescription) nc.symbolDescription = node.symbolDescription
   if (node.symbolLinks.length > 0) nc.symbolLinks = structuredClone(node.symbolLinks)
-  const componentPropDefs = node.componentPropertyDefinitions.map((def) => ({
-    id: getOrCreatePropertyGuid(context, def.id, localIdCounter),
-    name: def.name,
-    type: componentPropertyTypeForKiwi(def.type),
-    initialValue: componentPropertyValue(def.type, def.defaultValue, context, localIdCounter),
-    preferredValues: componentPropertyPreferredValues(def, context),
-    slotSettings: componentPropertySlotSettings(def, context, localIdCounter),
-    ...(def.type === 'SLOT'
-      ? {
-          sortPosition: '"',
-          varValue: componentPropertySlotVarValue(),
-          description: ''
-        }
-      : {})
-  }))
+  const componentPropDefs = node.componentPropertyDefinitions.map((def) => {
+    const payload = {
+      id: getOrCreatePropertyGuid(context, def.id, localIdCounter),
+      name: def.name,
+      type: componentPropertyTypeForKiwi(def.type),
+      initialValue: componentPropertyValue(def.type, def.defaultValue, context, localIdCounter),
+      preferredValues: componentPropertyPreferredValues(def, context),
+      slotSettings: componentPropertySlotSettings(def, context, localIdCounter)
+    }
+    if (def.type !== 'SLOT') return payload
+    return {
+      ...payload,
+      sortPosition: '"',
+      varValue: componentPropertySlotVarValue(),
+      description: ''
+    }
+  })
   if (shouldSerializeRawBackedField(node, 'componentPropDefs', componentPropDefs.length > 0)) {
     nc.componentPropDefs = componentPropDefs
   }

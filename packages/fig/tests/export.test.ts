@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { SceneGraph } from '@open-pencil/scene-graph'
+import { SceneGraph, setInstanceOverride } from '@open-pencil/scene-graph'
 import type { GUID } from '@open-pencil/scene-graph/primitives'
 
 import {
@@ -99,6 +99,86 @@ describe('@open-pencil/fig SceneGraph export policy', () => {
         textData: { characters: 'Edited' }
       }
     ])
+  })
+
+  test('removes stale slot-content overrides while preserving the slot container override', () => {
+    const graph = new SceneGraph()
+    const page = graph.getPages()[0]
+    const layout = graph.createNode('COMPONENT', page.id, {
+      name: 'Layout',
+      componentPropertyDefinitions: [{ id: '1:100', name: 'Main', type: 'SLOT', defaultValue: '' }]
+    })
+    const slot = graph.createNode('FRAME', layout.id, {
+      name: 'Main container',
+      componentPropertyReferences: [{ propertyId: '1:100', field: 'SLOT' }]
+    })
+    const content = graph.createNode('COMPONENT', page.id, {
+      name: 'Red card',
+      fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0, a: 1 }, opacity: 1, visible: true }]
+    })
+    graph.updateNode(slot.id, { source: { ...slot.source, id: '1:96' } })
+    graph.updateNode(content.id, { source: { ...content.source, id: '1:101' } })
+
+    const instance = graph.createInstance(layout.id, page.id)
+    if (!instance) throw new Error('failed to create layout instance')
+    const slotCopy = graph.getChildren(instance.id)[0]
+    graph.updateNode(instance.id, {
+      source: {
+        ...instance.source,
+        fig: {
+          ...instance.source.fig,
+          symbolOverrides: [
+            { guidPath: { guids: [{ sessionID: 1, localID: 96 }] }, opacity: 0.5 },
+            { guidPath: { guids: [{ sessionID: 1, localID: 101 }] }, opacity: 0.25 }
+          ],
+          componentPropAssignments: [
+            {
+              defID: { sessionID: 1, localID: 100 },
+              varValue: {
+                value: {
+                  slotContentIdValue: { guid: { sessionID: 1, localID: 101 } }
+                }
+              }
+            }
+          ]
+        }
+      }
+    })
+
+    graph.updateNode(instance.id, {
+      componentPropertyAssignments: { '1:100': content.id },
+      invalidatedOverrideComponentIds: [content.id]
+    })
+    const placed = graph.createInstance(content.id, slotCopy.id)
+    if (!placed) throw new Error('failed to place slot content')
+    graph.updateNode(placed.id, {
+      fills: [{ type: 'SOLID', color: { r: 0, g: 1, b: 0, a: 1 }, opacity: 1, visible: true }]
+    })
+    setInstanceOverride(instance.instanceOverrides, instance.id, placed.id, 'fills')
+    graph.updateNode(instance.id, { instanceOverrides: instance.instanceOverrides })
+
+    const [change] = sceneNodeToKiwi(
+      graph.getNode(instance.id) ?? instance,
+      { sessionID: 1, localID: 1 },
+      0,
+      { value: 200 },
+      graph,
+      []
+    )
+
+    const overrides = change.symbolData?.symbolOverrides
+    expect(overrides).toHaveLength(2)
+    expect(overrides?.[0]).toEqual({
+      guidPath: { guids: [{ sessionID: 1, localID: 96 }] },
+      opacity: 0.5
+    })
+    expect(overrides?.[1]).toEqual(
+      expect.objectContaining({
+        guidPath: { guids: [{ sessionID: 1, localID: 101 }] },
+        fillPaints: expect.any(Array)
+      })
+    )
+    expect(overrides?.[1]).not.toHaveProperty('opacity')
   })
 
   test('injects runtime glyph outlines into derived text data', () => {
