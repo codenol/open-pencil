@@ -765,13 +765,16 @@ interface RawComponentPropValue {
 
 interface RawComponentPropAssignment {
   defID?: GUID
-  value?: RawComponentPropValue
+  value?: RawComponentPropValue & {
+    slotContentIdValue?: { guid?: GUID }
+  }
   varValue?: {
     value?: {
       boolValue?: boolean
       textValue?: string
       textDataValue?: { characters?: string }
       symbolIdValue?: { guid?: GUID }
+      slotContentIdValue?: { guid?: GUID }
     }
   }
 }
@@ -843,6 +846,18 @@ function extractComponentPropertyRefs(nc: NodeChange): ComponentPropertyReferenc
 }
 
 function componentPropertyAssignmentValue(assignment: RawComponentPropAssignment): string {
+  // Содержимое места (свойство SLOT) — ссылка на компонент-наполнитель.
+  // Без чтения этой ссылки наполнение слота в инстансе теряется при открытии:
+  // слот показывался пустым, хотя в файле содержимое было.
+  const slotGuid =
+    assignment.value?.slotContentIdValue?.guid ?? assignment.varValue?.value?.slotContentIdValue?.guid
+  if (slotGuid) {
+    const EMPTY_GUID = { sessionID: 4294967295, localID: 4294967295 }
+    if (slotGuid.sessionID !== EMPTY_GUID.sessionID || slotGuid.localID !== EMPTY_GUID.localID) {
+      return guidToString(slotGuid)
+    }
+    return ''
+  }
   if (
     assignment.value &&
     (assignment.value.boolValue !== undefined ||

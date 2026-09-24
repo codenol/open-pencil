@@ -79,6 +79,50 @@ function applySwapProp(
   )
 }
 
+const EMPTY_SLOT_GUID = { sessionID: 4294967295, localID: 4294967295 }
+
+/**
+ * Наполнение места (свойство SLOT) в инстансе.
+ *
+ * Содержимое места живёт не в мастере, а в assignment инстанса: ссылка на
+ * компонент-наполнитель. Мастер при этом не меняется — поэтому один и тот же
+ * макетный компонент в разных экранах может держать разное содержимое.
+ *
+ * Копия места внутри инстанса получает наполнитель как инстанс: её прежние
+ * (умолчальные) дети убираются, иначе содержимое удвоится.
+ */
+function applySlotProp(
+  ctx: OverrideContext,
+  childId: string,
+  val: ComponentPropValue,
+  modified?: Set<string>
+): void {
+  const guid = val.slotContentIdValue?.guid
+  if (
+    !guid ||
+    (guid.sessionID === EMPTY_SLOT_GUID.sessionID && guid.localID === EMPTY_SLOT_GUID.localID)
+  ) {
+    return
+  }
+  const contentId = ctx.guidToNodeId.get(guidToString(guid))
+  if (!contentId) return
+  const slot = ctx.graph.getNode(childId)
+  const content = ctx.graph.getNode(contentId)
+  if (!slot || content?.type !== 'COMPONENT') return
+
+  // Уже наполнен этим компонентом — не трогаем.
+  if (
+    slot.childIds.length === 1 &&
+    ctx.graph.getNode(slot.childIds[0])?.componentId === contentId
+  ) {
+    return
+  }
+
+  for (const existing of [...slot.childIds]) ctx.graph.deleteNode(existing)
+  const placed = ctx.graph.createInstance(contentId, childId)
+  if (placed) modified?.add(childId)
+}
+
 export function applyComponentPropRef(
   ctx: OverrideContext,
   childId: string,
@@ -95,6 +139,9 @@ export function applyComponentPropRef(
       break
     case 'OVERRIDDEN_SYMBOL_ID':
       applySwapProp(ctx, childId, val, modified)
+      break
+    case 'SLOT_CONTENT_ID':
+      applySlotProp(ctx, childId, val, modified)
       break
   }
 }

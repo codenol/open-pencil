@@ -33,6 +33,28 @@ export function readSlot(
 }
 
 /**
+ * Слот ли узел: унаследованная метка в pluginData ИЛИ настоящее свойство
+ * типа SLOT (переключатель в панели «Дизайн», mark_slot) — у самого узла
+ * или у его мастера, если это копия внутри инстанса.
+ */
+export function isSlotNode(
+  graph: { getNode: (id: string) => { type: string; componentPropertyReferences?: Array<{ propertyId: string; field: string }> } | undefined },
+  node: {
+    componentId?: string | null
+    componentPropertyReferences?: Array<{ propertyId: string; field: string }>
+    pluginData?: Array<{ pluginId: string; key: string; value: string }>
+  }
+): boolean {
+  if (readSlot(node) !== null) return true
+  if (node.componentPropertyReferences?.some((ref) => ref.field === 'SLOT')) return true
+  const master = node.componentId ? graph.getNode(node.componentId) : undefined
+  if (master && master.type !== 'COMPONENT' && master.type !== 'COMPONENT_SET') {
+    return Boolean(master.componentPropertyReferences?.some((ref) => ref.field === 'SLOT'))
+  }
+  return false
+}
+
+/**
  * Слоты внутри узла — прямые дети, помеченные меткой.
  *
  * Нужны в чтении узла: увидев слот, ассистент должен понять, что наполнять

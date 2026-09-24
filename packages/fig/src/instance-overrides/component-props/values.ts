@@ -23,7 +23,17 @@ function isEmptyPropValue(v: ComponentPropValue | undefined): boolean {
     v.boolValue === undefined &&
     v.textValue === undefined &&
     v.textDataValue === undefined &&
-    v.guidValue === undefined
+    v.guidValue === undefined &&
+    v.slotContentIdValue === undefined
+  )
+}
+
+const EMPTY_SLOT_GUID = { sessionID: 4294967295, localID: 4294967295 }
+
+function isEmptySlotGuid(guid: { sessionID: number; localID: number } | undefined): boolean {
+  return (
+    !guid ||
+    (guid.sessionID === EMPTY_SLOT_GUID.sessionID && guid.localID === EMPTY_SLOT_GUID.localID)
   )
 }
 
@@ -37,6 +47,13 @@ function resolveAssignmentValue(
   if (value && !isEmptyPropValue(value)) return value
 
   const variableValue = assignment.varValue?.value
+  // Содержимое места (свойство SLOT): ссылка на компонент-наполнитель.
+  // Пустая ссылка (минус единица в беззнаковом) — место свободно, значения нет.
+  const slotGuid =
+    assignment.value?.slotContentIdValue?.guid ?? variableValue?.slotContentIdValue?.guid
+  if (slotGuid !== undefined) {
+    return isEmptySlotGuid(slotGuid) ? undefined : { slotContentIdValue: { guid: slotGuid } }
+  }
   if (variableValue?.symbolIdValue?.guid) return { guidValue: variableValue.symbolIdValue.guid }
   if (variableValue?.boolValue !== undefined) return { boolValue: variableValue.boolValue }
   if (variableValue?.textValue !== undefined) return { textValue: variableValue.textValue }

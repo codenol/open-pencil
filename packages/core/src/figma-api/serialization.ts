@@ -1,6 +1,6 @@
 import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
-import { childSlots, readSlot, SLOT_HINT } from '#core/tools/slots'
+import { childSlots, isSlotNode, SLOT_HINT } from '#core/tools/slots'
 import type { NodeProxyHost } from './proxy'
 
 /**
@@ -119,9 +119,10 @@ export function nodeProxyToJSON(
       'This is handled for you: a container marked as a place goes to its master ' +
       'and the content is saved there — just render or fill as usual.'
   }
-  // Пометка слота из pluginData: любой контейнер с ней наполняется готовым
-  // блоком, а не узлами напрямую. Разметку ставит tools/ds/mark-slots.mjs.
-  if (readSlot(n)) {
+  // Пометка слота: унаследованная метка в pluginData или настоящее свойство
+  // типа SLOT — любой контейнер с ними наполняется готовым блоком, а не
+  // узлами напрямую.
+  if (isSlotNode(graph, n)) {
     obj.slot = true
     // Где слот: в мастере или в рабочей копии. Без этого ассистент путался,
     // какой узел он видит, и уходил править мастер вместо своей страницы.

@@ -112,7 +112,7 @@ export function createAITools(store: EditorStore, diagnosticContext?: AIDiagnost
             )
           : def.execute(figma, args)
       },
-      onAfterExecute: async (def) => {
+      onAfterExecute: async (def, figma) => {
         if (isAtomicTool(def)) return
         if (def.mutates) {
           store.requestRender()

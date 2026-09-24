@@ -52,7 +52,7 @@ export interface AIAdapterOptions {
   getFigma: () => FigmaAPI
   onBeforeExecute?: (def: ToolDef) => void
   executeTool?: (def: ToolDef, figma: FigmaAPI, args: Record<string, unknown>) => Promise<unknown>
-  onAfterExecute?: (def: ToolDef) => Promise<void> | void
+  onAfterExecute?: (def: ToolDef, figma: FigmaAPI) => Promise<void> | void
   onFlashNodes?: (nodeIds: string[]) => void
   onToolLog?: (entry: ToolLogEntry) => void
   getStepBudget?: () => StepBudget
@@ -179,7 +179,7 @@ export function toolsToAI(
           emitToolLog(options, def, args, startTime, figma, nodeBefore, null, errorMsg)
           return { error: errorMsg }
         } finally {
-          await options.onAfterExecute?.(def)
+          await options.onAfterExecute?.(def, figma)
         }
       }
     }
