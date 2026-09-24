@@ -7,11 +7,10 @@
 // Запуск: bun tools/ds/mark-default-variants.mjs <вход.fig> <выход.fig> [--list]
 import { readFile, writeFile } from 'node:fs/promises'
 
-import * as figPkg from '/opt/open-pencil-clean/packages/fig/dist/index.js'
-import * as corePkg from '/opt/open-pencil-clean/packages/core/dist/index.js'
-import { exportFigFile } from '/opt/open-pencil-clean/packages/core/dist/io/formats/fig/index.js'
-import { releaseOriginalFigArchive } from '/opt/open-pencil-clean/packages/core/dist/kiwi/fig/session/original-archive.js'
-import { markDefaultVariant } from '/opt/open-pencil-clean/packages/core/dist/tools/default-variant.js'
+import * as corePkg from '@open-pencil/core'
+import { exportFigFile } from '@open-pencil/core/io'
+import { markDefaultVariant, releaseOriginalFigArchive } from '@open-pencil/core/tools'
+import * as figPkg from '@open-pencil/fig'
 
 const [input, output, ...flags] = process.argv.slice(2)
 const listOnly = flags.includes('--list')
@@ -21,6 +20,11 @@ const listOnly = flags.includes('--list')
  * Первый подошедший шаблон выигрывает.
  */
 const PREFERENCE = [
+  // Ячейка таблицы: обычная текстовая ячейка, а не служебная с чекбоксом.
+  /^content=text, type cell=default$/i,
+  /^content=text \+ badge, type cell=default$/i,
+  // Шапка таблицы: колонка с фильтром по тексту.
+  /^property 1=text-filter$/i,
   // Обычное состояние, никаких hover/disabled.
   /^state=default(,|$)/i,
   /^property 1=default$/i,
