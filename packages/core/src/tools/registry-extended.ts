@@ -36,6 +36,7 @@ import {
   setStrokeAlign,
   setTextResize,
   fillSlot,
+  markSlot,
   swapComponent,
   swapComponentSize,
   setVisible
@@ -153,6 +154,7 @@ export const EXTENDED_TOOLS: ToolDef[] = [
   setFontRange,
   setTextResize,
   fillSlot,
+  markSlot,
   swapComponent,
   swapComponentSize,
   setBlend,

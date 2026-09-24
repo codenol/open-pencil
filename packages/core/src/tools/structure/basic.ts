@@ -22,7 +22,8 @@ export const deleteNode = defineTool({
 export const cloneNode = defineTool({
   name: 'clone_node',
 
-  description: 'Clone (duplicate) a node.',
+  description:
+    'Clone (duplicate) a node. The clone is autonomous: links back into an instance master are dropped, so a cloned slot or frame becomes your own node that saves edits.',
   execution: { kind: 'sync', mutation: 'document' },
   input: v.object({
     id: v.pipe(v.string(), v.description('Node ID to clone'))
@@ -30,8 +31,40 @@ export const cloneNode = defineTool({
   execute: (figma, { id }) => {
     const node = figma.getNodeById(id)
     if (!node) return { error: `Node "${id}" not found` }
+
+    // Клон копии внутри инстанса не должен остаться внутри него: дети инстанса
+    // в файл не пишутся, и клон пропадёт при сохранении. Такой клон кладём на
+    // текущую страницу — он становится самостоятельным узлом.
+    const raw = figma.graph.getNode(id)
+    let insideInstance = Boolean(raw?.componentId)
+    let cursor = raw?.parentId ? figma.graph.getNode(raw.parentId) : undefined
+    while (!insideInstance && cursor) {
+      if (cursor.type === 'INSTANCE') insideInstance = true
+      cursor = cursor.parentId ? figma.graph.getNode(cursor.parentId) : undefined
+    }
+
     const clone = node.clone()
-    return nodeSummary(clone)
+    if (insideInstance) {
+      const page = figma.currentPage
+      figma.graph.reparentNode(clone.id, page.id)
+    }
+
+    // Клон копии из инстанса не должен ссылаться на мастера: иначе правки
+    // клона уйдут в чужой мастер или пропадут при сохранении. Связь с мастером
+    // остаётся только у настоящих инстансов (они несут её осмысленно).
+    const dropMasterLinks = (nodeId: string) => {
+      const entry = figma.graph.getNode(nodeId)
+      if (!entry) return
+      if (entry.type !== 'INSTANCE') {
+        figma.graph.updateNode(nodeId, {
+          ...(entry.componentId ? { componentId: null } : {}),
+          ...(entry.componentPropertyReferences?.length ? { componentPropertyReferences: [] } : {})
+        })
+      }
+      for (const childId of entry.childIds) dropMasterLinks(childId)
+    }
+    dropMasterLinks(clone.id)
+    return nodeSummary(figma.getNodeById(clone.id) ?? clone)
   }
 })
 

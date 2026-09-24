@@ -301,6 +301,10 @@ export const panelMessageDefaults = {
   layersCount: params('{count} layers'),
   goToMainComponent: 'Go to Main Component',
   detachInstance: 'Detach Instance',
+  slot: 'Slot',
+  slotContent: 'Content',
+  slotEmpty: 'Empty',
+  slotNeedsComponent: 'A slot lives inside a component — this element is not part of one',
 
   gap: 'Gap',
 

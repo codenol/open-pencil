@@ -18,7 +18,7 @@ import {
 } from '#core/color/okhcl'
 import type { OkHCLColor, OkHCLPayload } from '#core/color/okhcl'
 import { assertNodeEditable } from '#core/editor/capabilities'
-import { readSlot } from '#core/tools/slots'
+import { isSlotNode } from '#core/tools/slots'
 
 import { installBasicNodeProxyAccessors } from './accessors/basic'
 import { installLayoutNodeProxyAccessors } from './accessors/layout'
@@ -248,7 +248,7 @@ export class FigmaNodeProxy {
    * решал, что разметка врёт, и дальше действовал наугад.
    */
   get isSlot(): boolean {
-    return readSlot(this._raw()) !== null
+    return isSlotNode(this[INTERNAL_GRAPH], this._raw())
   }
 
   /** Где слот: в мастере или в рабочей копии. Пусто, если это не слот. */

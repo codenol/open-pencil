@@ -33,3 +33,11 @@ export {
 export { setPexelsAPIKey, setUnsplashAccessKey } from './stock-photo'
 export { importSVG } from './create'
 export { resolveDefaultVariant, markDefaultVariant } from './default-variant'
+export {
+  ensureSlotProperty,
+  getSlotPropertyInfo,
+  removeSlotProperty,
+  type SlotPropertyResult
+} from './slot-property'
+export { swapSlotContent, getSlotContentId, clearSlotContent } from './modify/swap'
+export { releaseOriginalFigArchive } from '../kiwi/fig/session/original-archive'

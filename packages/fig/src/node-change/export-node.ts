@@ -838,6 +838,27 @@ function applyComponentMetadata(
     .map(([propertyId, value]) => {
       const definition = context.componentPropertyDefinitionsById.get(propertyId)
       if (!definition) return null
+      // Содержимое места (свойство SLOT) — ссылка на компонент-наполнитель.
+      // Пишется в varValue с типом SLOT_CONTENT_ID, как в определении места.
+      // Пустое значение — пустая ссылка: место свободно.
+      if (definition.type === 'SLOT') {
+        const target = value ? context.graph.getNode(value) : undefined
+        const guid = target
+          ? getOrCreateNodeGuid(context, target.id, localIdCounter)
+          : parseGuidOrNull(value)
+        return {
+          defID: getOrCreatePropertyGuid(context, propertyId, localIdCounter),
+          varValue: {
+            value: {
+              slotContentIdValue: {
+                guid: guid ?? { sessionID: 4294967295, localID: 4294967295 }
+              }
+            },
+            dataType: 'SLOT_CONTENT_ID',
+            resolvedDataType: 'SLOT_CONTENT_ID'
+          }
+        }
+      }
       return {
         defID: getOrCreatePropertyGuid(context, propertyId, localIdCounter),
         value: componentPropertyValue(definition.type, value, context, localIdCounter)

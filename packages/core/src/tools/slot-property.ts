@@ -63,6 +63,79 @@ export interface SlotPropertyResult {
 }
 
 /**
+ * Чтение состояния слота: привязан ли узел (или его мастер-двойник) к
+ * свойству типа SLOT. Ничего не меняет — для UI и проверок.
+ */
+export function getSlotPropertyInfo(graph: SceneGraph, nodeId: string): SlotPropertyResult | null {
+  const found = graph.getNode(nodeId)
+  if (!found) return null
+  const target = masterSlot(graph, found)
+  const scope: 'master' | 'instance' = target.id === found.id ? 'master' : 'instance'
+  const ref = (target.componentPropertyReferences ?? []).find((r) => r.field === 'SLOT')
+  if (!ref) return null
+  const owner = ownerComponent(graph, target)
+  return { slotId: target.id, propertyId: ref.propertyId, ownerId: owner?.id ?? '', created: false, scope }
+}
+
+/**
+ * Снимает пометку слота: убирает ссылку у узла мастера, само свойство у
+ * владельца (если его больше никто не использует) и наполнение этого места
+ * во всех инстансах. Без зачистки assignments в файл ушла бы ссылка на
+ * несуществующее свойство.
+ */
+export function removeSlotProperty(graph: SceneGraph, nodeId: string): SlotPropertyResult | null {
+  const info = getSlotPropertyInfo(graph, nodeId)
+  if (!info) return null
+
+  // Ссылку снимаем со всех узлов: с мастера и с производных копий в инстансах —
+  // иначе копии продолжают ссылаться на свойство, и оно не снимается у владельца.
+  for (const node of graph.getAllNodes()) {
+    const refs = node.componentPropertyReferences
+    if (!refs?.some((ref) => ref.field === 'SLOT' && ref.propertyId === info.propertyId)) continue
+    graph.updateNode(node.id, {
+      componentPropertyReferences: refs.filter(
+        (ref) => !(ref.field === 'SLOT' && ref.propertyId === info.propertyId)
+      )
+    })
+  }
+
+  // Наполнение места во всех инстансах снимаем вместе с пометкой.
+  for (const node of graph.getAllNodes()) {
+    const assignments = node.componentPropertyAssignments
+    if (assignments && info.propertyId in assignments) {
+      const rest = { ...assignments }
+      delete rest[info.propertyId]
+      graph.updateNode(node.id, { componentPropertyAssignments: rest })
+    }
+  }
+
+  const owner = info.ownerId ? graph.getNode(info.ownerId) : undefined
+  if (owner?.componentPropertyDefinitions) {
+    // Свойство могут использовать другие слоты владельца — тогда оставляем.
+    let usedElsewhere = false
+    for (const node of graph.getAllNodes()) {
+      if (
+        node.componentPropertyReferences?.some(
+          (ref) => ref.field === 'SLOT' && ref.propertyId === info.propertyId
+        )
+      ) {
+        usedElsewhere = true
+        break
+      }
+    }
+    if (!usedElsewhere) {
+      graph.updateNode(owner.id, {
+        componentPropertyDefinitions: owner.componentPropertyDefinitions.filter(
+          (definition) => definition.id !== info.propertyId
+        )
+      })
+    }
+  }
+
+  return info
+}
+
+/**
  * Делает узел настоящим местом-слотом.
  *
  * Возвращает описание того, что сделано, либо null, если владельца свойств

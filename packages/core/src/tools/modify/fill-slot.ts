@@ -4,7 +4,7 @@ import { nodeIdInput } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
 import { releaseOriginalFigArchive } from '#core/kiwi/fig/session/original-archive'
 import { ensureSlotProperty } from '#core/tools/slot-property'
-import { readSlot } from '#core/tools/slots'
+import { isSlotNode } from '#core/tools/slots'
 
 /**
  * Заполнение слота готовым блоком.
@@ -45,7 +45,7 @@ export const fillSlot = defineTool({
     if (!slot) return { error: `Node "${args.id}" not found` }
 
     // Слот или нет — сообщаем прямо: инструмент можно позвать и по ошибке.
-    const marked = readSlot(slot) !== null
+    const marked = isSlotNode(figma.graph, slot)
     const looksLikeSlot = marked || /slot|main container/i.test(slot.name.trim())
     if (!looksLikeSlot) {
       return {

@@ -3,7 +3,7 @@ import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 import { detectIssues } from './issues'
 import { detectRuleViolations } from './rule-issues'
 import type { DescribeIssue } from './issues'
-import { readSlot, SLOT_HINT } from '#core/tools/slots'
+import { isSlotNode, SLOT_HINT } from '#core/tools/slots'
 
 import { detectRole } from './roles'
 import { describeLayout, describeVisual, summarizeContainer, summarizeText } from './summaries'
@@ -77,7 +77,7 @@ export function describeOneNode(
   if (issues.length > 0) result.issues = issues
   // Слот: контейнер, который наполняется готовым блоком. Видно при осмотре,
   // чтобы ассистент не добавлял узлы напрямую в инстанс.
-  if (readSlot(raw)) {
+  if (isSlotNode(figma.graph, raw)) {
     result.slot = true
     if (raw.childIds.length === 0) result.slotHint = SLOT_HINT
   }

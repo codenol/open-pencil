@@ -15,7 +15,8 @@ const defaultNames = new Set([
   'get_components',
   'list_libraries',
   'insert_library_component',
-  // Сборка из компонентов: без этих двух слот не заполнить и компонент не подменить.
+  // Сборка из компонентов: без этих слот не пометить, не заполнить и компонент не подменить.
+  'mark_slot',
   'fill_slot',
   'swap_component',
   'swap_component_size',

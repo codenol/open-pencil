@@ -34,6 +34,7 @@ export type ComponentPropValue = {
   textValue?: ComponentPropTextValue
   textDataValue?: { characters?: string }
   guidValue?: GUID
+  slotContentIdValue?: { guid?: GUID }
 }
 
 export interface ComponentPropAssignment {
@@ -45,6 +46,7 @@ export interface ComponentPropAssignment {
       textValue?: string
       textDataValue?: { characters?: string }
       symbolIdValue?: { guid?: GUID }
+      slotContentIdValue?: { guid?: GUID }
     }
   }
 }

@@ -26,6 +26,7 @@ import PageSection from './properties/PageSection.vue'
 import RetainedPanel from './properties/panel/RetainedPanel.vue'
 import PositionSection from './properties/PositionSection.vue'
 import SelectionActionsControl from './properties/SelectionActionsControl.vue'
+import SlotSection from './properties/SlotSection.vue'
 import StrokeSection from './properties/stroke/StrokeSection.vue'
 import TypographySection from './properties/TypographySection.vue'
 import VariablesSection from './properties/VariablesSection.vue'
@@ -151,6 +152,7 @@ const { panels } = useI18n()
       </div>
 
       <ComponentPropertiesSection v-if="node.type === 'INSTANCE'" />
+      <SlotSection />
       <VariantAuthoringSection
         v-if="
           node.type === 'COMPONENT_SET' ||

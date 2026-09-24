@@ -436,7 +436,10 @@ function remapInstanceSwapPropertyValues(
         let changed = false
         const assignments = { ...node.componentPropertyAssignments }
         for (const [propId, value] of Object.entries(assignments)) {
-          if (defsById.get(propId)?.type !== 'INSTANCE_SWAP') continue
+          // Ссылки на компоненты: и подмена инстанса, и содержимое места
+          // (свойство SLOT) хранят в файле guid — переводим в номер узла.
+          const propType = defsById.get(propId)?.type
+          if (propType !== 'INSTANCE_SWAP' && propType !== 'SLOT') continue
           const remapped = guidToNodeId.get(value)
           if (remapped) {
             assignments[propId] = remapped

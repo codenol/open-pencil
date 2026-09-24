@@ -26,6 +26,16 @@ export function createDevServerOptions(host: string | undefined, rootDir: string
     port: 1420,
     strictPort: true,
     host: host || false,
+    // Dev-прокси для хранилища документов: редактор ходит на /store того же
+    // домена, а локально рядом поднят tools/storage/server.mjs (порт 7802).
+    // Адрес можно переопределить: OPENPENCIL_STORE_TARGET=http://host:port.
+    proxy: {
+      '/store': {
+        target: process.env.OPENPENCIL_STORE_TARGET ?? 'http://127.0.0.1:7802',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/store/, '')
+      }
+    },
     hmr: host
       ? {
           protocol: 'ws',
