@@ -11,10 +11,10 @@
 // Запуск: bun tools/ds/component-rules.mjs <вход.fig> <выход.fig> [--only=имя] [--list]
 import { readFile, writeFile } from 'node:fs/promises'
 
-import * as figPkg from '/opt/open-pencil-clean/packages/fig/dist/index.js'
-import * as corePkg from '/opt/open-pencil-clean/packages/core/dist/index.js'
-import { exportFigFile } from '/opt/open-pencil-clean/packages/core/dist/io/formats/fig/index.js'
-import { releaseFigPopulationWorker } from '/opt/open-pencil-clean/packages/core/dist/kiwi/fig/population/client.js'
+import * as corePkg from '@open-pencil/core'
+import { exportFigFile } from '@open-pencil/core/io'
+import { releaseFigPopulationWorker } from '@open-pencil/core/kiwi'
+import * as figPkg from '@open-pencil/fig'
 
 const [input, output, ...flags] = process.argv.slice(2)
 const listOnly = flags.includes('--list')
@@ -341,6 +341,8 @@ const TABLE_RULES = rule({
   purpose: 'Показывает однотипные записи строками: инстансы, кластеры, узлы, ПАК.',
   use: [
     'Брать готовый компонент Table, а не рисовать таблицу фреймами.',
+    'Строка — из `table cell`, шапка — из `table header cell`; `Table` — готовый компонент с тулбаром, а не сет вариантов, отдельного набора вариантов у него нет.',
+    'Шапка берётся вариантом по колонке: `Property 1=Text-filter` — обычная колонка с фильтром, `Property 1=Сheckbox-text-filter` — с выбором строк, `Property 1=icon+filter` — с иконкой, `Property 1=Settings` — колонка настроек, `Property 1=Empty` — без подписи.',
     'Число строк — по числу записей: одна запись одна строка. Пустых строк не оставлять.',
     'Ширину задаёт колонка, а ячейка тянется по ней.',
     'Текст ячейки — через текстовый узел внутри ячейки.',
@@ -379,7 +381,9 @@ const CELL_RULES = rule({
   use: [
     'Только внутри строки таблицы, в колонке своего назначения.',
     'Ширина приходит от колонки: ячейка растянута по родителю.',
-    'Вид выбирается по содержимому: текст, текст с бейджем, статус, действие.',
+    'Вид берётся вариантом набора по содержимому: `Content=Text` — текст, `Content=Text + badge` — текст с бейджем, `Content=Badge-1..3` — бейдж, `Content=Status` — статус, `Content=Status + icon action` — статус с действием, `Content=Lead text checkbox` — выбор строки, `Content=Switch` — переключатель, `Content=Chevron` или `Content=Ellipsis-vertical` — иконка строки или меню, `Content=Empty` — пустая ячейка.',
+    'Фон строки задаёт `Type cell`: `Default` — обычная, `Alternative` — соседняя; чередование идёт по строкам.',
+    'Обычная текстовая ячейка — `Content=Text, Type cell=Default`.',
     'Текст — в текстовый узел внутри ячейки.'
   ],
   avoid: [

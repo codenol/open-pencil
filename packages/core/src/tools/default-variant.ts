@@ -18,26 +18,28 @@ export interface DefaultVariant {
   variantName: string
 }
 
-interface NodeWithPluginData {
-  pluginData?: readonly { pluginId: string; key: string; value: string }[]
-}
-
 function read(graph: SceneGraph, setId: string): DefaultVariant | null {
   const set = graph.getNode(setId)
   if (!set) return null
-  const entry = (set as unknown as NodeWithPluginData).pluginData?.find(
+  const entry = set.pluginData.find(
     (item) => item.pluginId === RULES_PLUGIN_ID && item.key === DEFAULT_VARIANT_KEY
   )
   if (!entry) return null
   try {
     const parsed = JSON.parse(entry.value) as Partial<DefaultVariant>
-    if (typeof parsed.variantId !== 'string') return null
-    // Вариант мог исчезнуть — тогда базового нет.
-    if (!graph.getNode(parsed.variantId)) return null
-    return {
-      variantId: parsed.variantId,
-      variantName: typeof parsed.variantName === 'string' ? parsed.variantName : parsed.variantId
+    // Номер варианта мог устареть: узлы получают новые номера при пересборке
+    // документа. Имя варианта остаётся тем же, поэтому ищем по нему — иначе
+    // пометка молча превращается в «взять первый вариант».
+    const byId = typeof parsed.variantId === 'string' ? graph.getNode(parsed.variantId) : undefined
+    if (byId && set.childIds.includes(byId.id) && byId.type === 'COMPONENT') {
+      return { variantId: byId.id, variantName: byId.name }
     }
+    if (typeof parsed.variantName !== 'string' || parsed.variantName.trim() === '') return null
+    const wanted = parsed.variantName.trim()
+    const byName = set.childIds
+      .map((id) => graph.getNode(id))
+      .find((variant) => variant?.type === 'COMPONENT' && variant.name.trim() === wanted)
+    return byName ? { variantId: byName.id, variantName: byName.name } : null
   } catch {
     return null
   }
@@ -46,9 +48,10 @@ function read(graph: SceneGraph, setId: string): DefaultVariant | null {
 /**
  * Вариант, который берём по умолчанию.
  *
- * Порядок: помеченный базовый → вариант `Property 1=Default`, `State=Default`
- * или `Size=16` → первый вариант. Так панель и ассистент всегда получают
- * осмысленный выбор, даже если базовый не помечен.
+ * Порядок: пометка сета (по номеру, а если номер устарел — по имени варианта)
+ * → вариант `Property 1=Default`, `State=Default` или `Size=16` → первый
+ * вариант. Так панель и ассистент всегда получают осмысленный выбор, даже если
+ * базовый не помечен.
  */
 export function resolveDefaultVariant(
   graph: SceneGraph,
@@ -109,7 +112,7 @@ export function markDefaultVariant(
     key: DEFAULT_VARIANT_KEY,
     value: JSON.stringify({ variantId, variantName: variant.name })
   }
-  const rest = ((set as unknown as NodeWithPluginData).pluginData ?? []).filter(
+  const rest = set.pluginData.filter(
     (item) => !(item.pluginId === RULES_PLUGIN_ID && item.key === DEFAULT_VARIANT_KEY)
   )
   graph.updateNode(setId, { pluginData: [...rest, entry] })
