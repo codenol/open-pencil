@@ -71,6 +71,56 @@ export function readComponentRules(
   return null
 }
 
+/**
+ * Записывает правила компонента.
+ *
+ * Правила варианта живут на его сете — как и при чтении: у варианта своего
+ * набора правил не бывает. Пустые правила снимают пометку целиком, чтобы
+ * «правил нет» и «правила из одних пустых строк» не различались.
+ */
+export function writeComponentRules(
+  graph: SceneGraph,
+  componentId: string,
+  rules: ComponentRules
+): boolean {
+  const node = graph.getNode(componentId)
+  if (!node) return false
+
+  const parent = node.parentId ? graph.getNode(node.parentId) : null
+  const target =
+    node.type === 'COMPONENT' && parent?.type === 'COMPONENT_SET' ? parent : node
+  if (target.type !== 'COMPONENT' && target.type !== 'COMPONENT_SET') return false
+
+  const cleaned = cleanRules(rules)
+  const rest = target.pluginData.filter(
+    (item) => !(item.pluginId === RULES_PLUGIN_ID && item.key === RULES_KEY)
+  )
+  if (!cleaned) {
+    graph.updateNode(target.id, { pluginData: rest })
+    return true
+  }
+  graph.updateNode(target.id, {
+    pluginData: [
+      ...rest,
+      { pluginId: RULES_PLUGIN_ID, key: RULES_KEY, value: JSON.stringify(cleaned) }
+    ]
+  })
+  return true
+}
+
+/** Оставляет только непустые разделы; пустой набор — это отсутствие правил. */
+function cleanRules(rules: ComponentRules): ComponentRules | null {
+  const cleaned: ComponentRules = {}
+  if (typeof rules.purpose === 'string' && rules.purpose.trim() !== '') {
+    cleaned.purpose = rules.purpose.trim()
+  }
+  for (const key of ['howto', 'use', 'avoid', 'allowed', 'forbidden', 'checks'] as const) {
+    const items = (rules[key] ?? []).map((item) => item.trim()).filter((item) => item !== '')
+    if (items.length > 0) cleaned[key] = items
+  }
+  return Object.keys(cleaned).length > 0 ? cleaned : null
+}
+
 /** Один компонент с правилами и понятным «кто это». */
 export interface RulesViolationTarget {
   componentId: string

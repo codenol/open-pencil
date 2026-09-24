@@ -1,44 +1,21 @@
 import { computed } from 'vue'
 
-import { useEditorStore } from '@/app/editor/active-store'
+import {
+  readComponentRules,
+  releaseOriginalFigArchive,
+  writeComponentRules,
+  type ComponentRules
+} from '@open-pencil/core/tools'
+
+import { useEditorStore, type EditorStore } from '@/app/editor/active-store'
 
 /**
  * Правила компонента: когда брать, что можно менять, что нельзя.
  * Лежат в pluginData компонента — рядом с ним, поэтому едут вместе с файлом
- * и с библиотекой. Формат один на все компоненты.
+ * и с библиотекой. Читает и пишет их ядро: у панели и у ассистента один
+ * источник правды.
  */
-const PLUGIN_ID = 'norka.design-system'
-const RULES_KEY = 'component-rules'
-
-export interface ComponentRules {
-  purpose?: string
-  /** Порядок сборки: шаги, по которым компонент собирают. */
-  howto?: string[]
-  use?: string[]
-  avoid?: string[]
-  allowed?: string[]
-  forbidden?: string[]
-  checks?: string[]
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string')
-}
-
-function parseRules(raw: string): ComponentRules | null {
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-    if (!parsed || typeof parsed !== 'object') return null
-    const rules: ComponentRules = {}
-    if (typeof parsed.purpose === 'string') rules.purpose = parsed.purpose
-    for (const key of ['howto', 'use', 'avoid', 'allowed', 'forbidden', 'checks'] as const) {
-      if (isStringArray(parsed[key])) rules[key] = parsed[key]
-    }
-    return rules
-  } catch {
-    return null
-  }
-}
+export type { ComponentRules }
 
 /**
  * Правила есть только у компонентов: у обычного слоя их не бывает.
@@ -55,10 +32,21 @@ export interface ComponentRulesEntry {
   scope: RulesScope
 }
 
+/** Разделы правил по порядку: сначала инструкция, потом запреты и проверки. */
+export const RULES_SECTIONS = ['howto', 'use', 'avoid', 'allowed', 'forbidden', 'checks'] as const
+
+export type RulesSection = 'purpose' | (typeof RULES_SECTIONS)[number]
+
 /** Находит компонент-владельца правил для выделенного слоя. */
 function resolveOwner(
   graph: ReturnType<typeof useEditorStore>['graph'],
-  selected: { id: string; type: string; name: string; componentId?: string | null; parentId?: string | null }
+  selected: {
+    id: string
+    type: string
+    name: string
+    componentId?: string | null
+    parentId?: string | null
+  }
 ): { id: string; name: string; scope: RulesScope } | null {
   // Выделен сам компонент — правила его.
   if (selected.type === 'COMPONENT') {
@@ -104,23 +92,47 @@ export function useComponentRules() {
     const owner = resolveOwner(editor.graph, selected)
     if (!owner) return null
 
-    // Ищем правила на самом компоненте, затем на сете, если компонент — вариант.
-    const candidates = [editor.graph.getNode(owner.id)].filter(Boolean)
-    const ownerNode = editor.graph.getNode(owner.id)
-    if (ownerNode?.parentId) {
-      const parent = editor.graph.getNode(ownerNode.parentId)
-      if (parent?.type === 'COMPONENT_SET') candidates.push(parent)
-    }
+    const rules = readComponentRules(editor.graph, owner.id)
+    if (!rules) return null
+    return { componentId: owner.id, name: owner.name, rules, scope: owner.scope }
+  })
+}
 
-    for (const node of candidates) {
-      if (!node) continue
-      const entry = node.pluginData?.find(
-        (item) => item.pluginId === PLUGIN_ID && item.key === RULES_KEY
-      )
-      if (!entry) continue
-      const rules = parseRules(entry.value)
-      if (rules) return { componentId: owner.id, name: owner.name, rules, scope: owner.scope }
-    }
-    return null
+/** Компонент, чьи правила правят: сам компонент, его сет или мастер копии. */
+export function rulesOwner(selectedId: string | undefined): { id: string; name: string } | null {
+  const editor = useEditorStore()
+  if (!selectedId) return null
+  const selected = editor.graph.getNode(selectedId)
+  if (!selected) return null
+  const owner = resolveOwner(editor.graph, selected)
+  return owner ? { id: owner.id, name: owner.name } : null
+}
+
+/** Правила конкретного компонента — для редактора. */
+export function readRules(componentId: string): ComponentRules | null {
+  const editor = useEditorStore()
+  return readComponentRules(editor.graph, componentId)
+}
+
+/**
+ * Записывает правила компонента с отменой.
+ *
+ * Правка живёт в pluginData, поэтому вместо снимка страницы пишем обратное
+ * действие: снятие архива делает документ изменённым, и правила переживают
+ * сохранение и перезагрузку.
+ */
+export function writeRules(store: EditorStore, componentId: string, rules: ComponentRules): void {
+  const before = readComponentRules(store.graph, componentId)
+  const apply = (value: ComponentRules | null) => {
+    writeComponentRules(store.graph, componentId, value ?? {})
+    releaseOriginalFigArchive(store.graph)
+    store.requestRender()
+  }
+
+  apply(rules)
+  store.pushUndoEntry({
+    label: 'Правила компонента',
+    forward: () => apply(rules),
+    inverse: () => apply(before)
   })
 }
