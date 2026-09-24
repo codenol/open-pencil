@@ -34,6 +34,13 @@ export { setPexelsAPIKey, setUnsplashAccessKey } from './stock-photo'
 export { importSVG } from './create'
 export { resolveDefaultVariant, markDefaultVariant } from './default-variant'
 export {
+  readComponentRules,
+  writeComponentRules,
+  RULES_KEY,
+  RULES_PLUGIN_ID,
+  type ComponentRules
+} from './component-rules'
+export {
   ensureSlotProperty,
   getSlotPropertyInfo,
   removeSlotProperty,
