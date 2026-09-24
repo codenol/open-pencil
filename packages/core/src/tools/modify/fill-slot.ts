@@ -1,10 +1,23 @@
 import * as v from 'valibot'
 
+import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
+
+import type { FigmaAPI } from '#core/figma-api'
 import { nodeIdInput } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
 import { releaseOriginalFigArchive } from '#core/kiwi/fig/session/original-archive'
 import { ensureSlotProperty } from '#core/tools/slot-property'
 import { isSlotNode } from '#core/tools/slots'
+
+import { getSlotContentId, swapSlotContent } from './swap'
+
+/** Что уже лежит в месте: id, вид, имя и, для копии, её мастер. */
+interface SlotContentEntry {
+  id: string
+  type: string
+  name: string
+  of?: string
+}
 
 /**
  * Заполнение слота готовым блоком.
@@ -15,6 +28,11 @@ import { isSlotNode } from '#core/tools/slots'
  * компонента. Тогда содержимое принадлежит компоненту, сохраняется, а мастер
  * не меняется: его слот просто занят.
  *
+ * Кого именно касается правка, решает узел, который дали. Место внутри
+ * рабочей копии — это экран: назначение ложится на его экземпляр, соседние
+ * экраны и мастер остаются как были. Место в мастере — общий случай: блок
+ * расходится по всем копиям.
+ *
  * Слот может быть непустым, и это нормально — в нём уже может лежать то, что
  * нужно. Поэтому сначала смотрим, что внутри, и заменяем только осмысленно:
  * прежнее содержимое возвращается в ответе, чтобы человек решил сам.
@@ -22,7 +40,7 @@ import { isSlotNode } from '#core/tools/slots'
 export const fillSlot = defineTool({
   name: 'fill_slot',
   description:
-    'Put a block into a slot. Pass the slot node and the component to place. The block goes in as an instance, so it saves and the master stays unchanged. If the slot is already filled, the current content is reported before it is replaced.',
+    'Put a block into a slot. Pass the slot node and the component to place. A slot inside a screen belongs to that screen: the assignment lands on that instance and the other screens keep their slots as they were. A slot in a master is the shared default — every screen gets the block. The block goes in as an instance, so it saves. If the slot is already filled, the current content is reported before it is replaced.',
   execution: { kind: 'sync', mutation: 'document' },
   input: v.object({
     id: nodeIdInput,
@@ -69,35 +87,30 @@ export const fillSlot = defineTool({
     if ('error' in target) return target
 
     // Что уже лежит внутри: человек должен знать, что заменяется.
-    const existing = slot.childIds.map((childId) => {
-      const child = figma.graph.getNode(childId)
-      if (!child) return { id: childId, type: 'UNKNOWN', name: '' }
-      const master = child.type === 'INSTANCE' ? figma.graph.getNode(child.componentId ?? '') : null
-      return {
-        id: child.id,
-        type: child.type,
-        name: child.name.trim(),
-        ...(master ? { of: master.name.trim() } : {})
-      }
-    })
+    const existing = describeSlotContent(figma.graph, slot)
 
     // Внутри уже нужный компонент — не трогаем.
-    const alreadyRight =
-      existing.length === 1 &&
-      existing[0].type === 'INSTANCE' &&
-      figma.graph.getNode(slot.childIds[0])?.componentId === target.id
-    if (alreadyRight) {
-      return { slot: slot.id, placed: existing[0].id, unchanged: true, note: 'The slot already holds this component.' }
+    if (slotHoldsComponent(figma.graph, slot, existing, target.id)) {
+      return {
+        slot: slot.id,
+        placed: existing[0]?.id ?? null,
+        unchanged: true,
+        note: 'The slot already holds this component.'
+      }
     }
 
-    const replace = args.replace ?? true
-    if (existing.length > 0 && !replace) {
+    if (existing.length > 0 && !(args.replace ?? true)) {
       return {
         slot: slot.id,
         filled: false,
         existing,
         note: 'The slot is not empty and replace was false. Reported the content without changing anything.'
       }
+    }
+
+    // Место внутри рабочей копии: правим только этот экран.
+    if (scope === 'instance') {
+      return fillScreenSlot(figma, slot, target, existing, args.variant_values)
     }
 
     // Пометки мало: чтобы содержимое пережило сохранение, место должно быть
@@ -123,7 +136,7 @@ export const fillSlot = defineTool({
     if (!instance) return { error: `Failed to place "${target.name.trim()}" into the slot` }
 
     const removed: string[] = []
-    if (replace) {
+    if (args.replace ?? true) {
       // Прежнее содержимое ищем в целевом слоте: если наполняли мастер,
       // там и лежит то, что надо убрать.
       const inTarget = figma.graph.getNode(targetSlotId)?.childIds ?? []
@@ -165,6 +178,73 @@ export const fillSlot = defineTool({
     }
   }
 })
+
+/** Что лежит в месте сейчас: id, вид, имя и, для копии, её мастер. */
+function describeSlotContent(
+  graph: { getNode: (id: string) => SceneNode | undefined },
+  slot: SceneNode
+): SlotContentEntry[] {
+  return slot.childIds.map((childId) => {
+    const child = graph.getNode(childId)
+    if (!child) return { id: childId, type: 'UNKNOWN', name: '' }
+    const master = child.type === 'INSTANCE' ? graph.getNode(child.componentId ?? '') : undefined
+    return {
+      id: child.id,
+      type: child.type,
+      name: child.name.trim(),
+      ...(master ? { of: master.name.trim() } : {})
+    }
+  })
+}
+
+/**
+ * В месте уже нужный компонент — тогда ничего не делаем. Содержимое бывает
+ * задано только назначением, без узла в копии: проверяем и его.
+ */
+function slotHoldsComponent(
+  graph: SceneGraph,
+  slot: SceneNode,
+  existing: SlotContentEntry[],
+  componentId: string
+): boolean {
+  if (getSlotContentId(graph, slot) === componentId) return true
+  if (existing.length !== 1 || existing[0].type !== 'INSTANCE') return false
+  return graph.getNode(slot.childIds[0])?.componentId === componentId
+}
+
+/**
+ * Место внутри экрана: назначение ложится на сам экземпляр, поэтому мастер и
+ * другие экраны остаются как были. Содержимое ссылается на свойство владельца,
+ * так что место всё равно доводим до настоящего.
+ */
+function fillScreenSlot(
+  figma: FigmaAPI,
+  slot: SceneNode,
+  target: { id: string; name: string },
+  existing: SlotContentEntry[],
+  variantValues: string | undefined
+): Record<string, unknown> | { error: string } {
+  const slotProperty = ensureSlotProperty(figma.graph, slot.id)
+  const swapped = swapSlotContent(figma.graph, slot, target.id, variantValues)
+  if ('error' in swapped) return swapped
+
+  const response: Record<string, unknown> = {
+    ...swapped,
+    requestedSlot: slot.id,
+    component: target.id,
+    componentName: target.name.trim(),
+    note: 'The block belongs to this screen only: the assignment sits on this instance, so the master and the other screens keep their slots as they were, and the content saves with the file.'
+  }
+  if (existing.length > 0) {
+    response.replaced = existing
+    response.removed = existing.map((entry) => entry.id)
+  }
+  if (slotProperty) {
+    response.slotProperty = slotProperty.propertyId
+    response.slotIsReal = true
+  }
+  return response
+}
 
 /** Где лежит узел: в мастере, в инстансе или на странице. */
 function slotScopeOf(

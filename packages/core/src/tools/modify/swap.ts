@@ -231,6 +231,7 @@ export function swapSlotContent(
     releaseOriginalFigArchive(graph)
     return {
       ...swapResult(slotCopy.id, resolved),
+      placed: placed.id,
       note: 'The slot in the master now holds your component as the default content — every instance shows it, and it saves with the file.'
     }
   }
@@ -256,6 +257,7 @@ export function swapSlotContent(
 
   return {
     ...swapResult(slotCopy.id, resolved),
+    placed: placed.id,
     slotOf: topInstance.id,
     note: 'The slot of this one instance now holds your component; the master and other instances are unchanged, and the content saves with the file.'
   }
