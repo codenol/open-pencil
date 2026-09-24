@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import { useI18n } from '@open-pencil/vue'
 
 import { useComponentRules } from '@/app/libraries/component-rules'
@@ -14,8 +16,11 @@ const entry = useComponentRules()
 /** Порядок разделов правил; заголовки берутся из переводов. */
 const sections = ['use', 'avoid', 'allowed', 'forbidden', 'checks'] as const
 
+/** Инструкция идёт первой: с неё начинают, остальное читают по ходу. */
+const howto = computed(() => entry.value?.rules.howto ?? [])
+
 /** Заголовок раздела правил на текущем языке. */
-function sectionTitle(section: (typeof sections)[number]): string {
+function sectionTitle(section: string): string {
   const titles = panels.value.rulesSections as unknown as Record<string, string>
   return titles[section] ?? section
 }
@@ -34,6 +39,22 @@ function sectionTitle(section: (typeof sections)[number]): string {
           {{ entry.rules.purpose }}
         </p>
       </header>
+
+      <section v-if="howto.length > 0" class="mb-4" data-test-id="rules-howto">
+        <h4 class="mb-1.5 text-[11px] font-semibold text-surface">
+          {{ sectionTitle('howto') }}
+        </h4>
+        <ol class="space-y-1.5">
+          <li
+            v-for="(step, index) in howto"
+            :key="index"
+            class="flex gap-2 text-xs leading-relaxed text-muted"
+          >
+            <span class="text-accent tabular-nums">{{ index + 1 }}.</span>
+            <span>{{ step }}</span>
+          </li>
+        </ol>
+      </section>
 
       <section
         v-for="section in sections"

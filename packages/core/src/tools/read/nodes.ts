@@ -1,6 +1,9 @@
 import * as v from 'valibot'
 
+import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
+
 import type { FigmaNodeProxy } from '#core/figma-api'
+import { readComponentRules, type ComponentRules } from '#core/tools/component-rules'
 import { toolNumber, nodeIdInput } from '#core/tools/input'
 import { defineTool, nodeSummary, nodeToResult } from '#core/tools/schema'
 
@@ -112,16 +115,32 @@ export const getNode = defineTool({
     // в два уровня показывает строение, но не выкладывает все копии.
     const result = nodeToResult(node, depth ?? DEFAULT_NODE_DEPTH)
     const raw = figma.graph.getNode(id)
+    // Правила компонента едут с ним: читающему мастер или копию они нужны
+    // сразу, а не после вставки — иначе он идёт выяснять строение сам.
+    const rules = componentRulesFor(figma.graph, raw)
+    const withRules = rules ? { ...result, rules } : result
     const variants = raw?.childIds.length ?? 0
     if (variants > VARIANT_WARNING_THRESHOLD) {
       return {
-        ...result,
+        ...withRules,
         note: `Children shown to depth ${depth ?? DEFAULT_NODE_DEPTH}. This node holds ${variants} children — pass depth for more, or search variants instead of reading them all.`
       }
     }
-    return result
+    return withRules
   }
 })
+
+/** Правила компонента, его сета или мастера копии. */
+function componentRulesFor(graph: SceneGraph, node: SceneNode | undefined): ComponentRules | null {
+  if (!node) return null
+  if (node.type === 'INSTANCE') {
+    return node.componentId ? readComponentRules(graph, node.componentId) : null
+  }
+  if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') {
+    return readComponentRules(graph, node.id)
+  }
+  return null
+}
 
 /** Предел вложенности по умолчанию: строение видно, копии вариантов — нет. */
 const DEFAULT_NODE_DEPTH = 2

@@ -22,6 +22,7 @@ export const panelMessageDefaults = {
     'When to use this component, when not to, what may be changed and what must stay as is.',
   rulesEmpty: 'No rules yet. They will appear here.',
   rulesSections: {
+    howto: 'How to assemble',
     use: 'When to use',
     avoid: 'When not to use',
     allowed: 'What may be changed',
