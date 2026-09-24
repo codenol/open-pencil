@@ -263,6 +263,9 @@ export function cloneNodeProps(
       variableModes: { ...src.variableModes },
       instanceOverrides: cloneInstanceOverrideState(src.instanceOverrides),
       componentPropertyAssignments: { ...src.componentPropertyAssignments },
+      invalidatedOverrideComponentIds: copyOpt(src.invalidatedOverrideComponentIds, (ids) => [
+        ...ids
+      ]),
 
       componentPropertyValues: { ...src.componentPropertyValues }
     }
@@ -294,6 +297,9 @@ export function cloneNodeProps(
     componentPropertyDefinitions: copyPropertyDefs(src.componentPropertyDefinitions),
     componentPropertyReferences: copySpread(src.componentPropertyReferences),
     componentPropertyAssignments: { ...src.componentPropertyAssignments },
+    invalidatedOverrideComponentIds: copyOpt(src.invalidatedOverrideComponentIds, (ids) => [
+      ...ids
+    ]),
     symbolLinks: copySpread(src.symbolLinks),
     variantPropSpecs: copySpread(src.variantPropSpecs),
     pluginData: copySpread(src.pluginData),

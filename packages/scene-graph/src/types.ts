@@ -546,6 +546,13 @@ export interface SceneNode {
   componentPropertyDefinitions: ComponentPropertyDefinition[]
   componentPropertyReferences: ComponentPropertyReference[]
   componentPropertyAssignments: Record<string, string>
+  /**
+   * Component roots whose preserved instance overrides became stale after a
+   * component-property mutation. Exporters may drop raw overrides for these
+   * roots before serializing current live overrides. This marker is transient
+   * and is never persisted in document formats.
+   */
+  invalidatedOverrideComponentIds?: string[]
   componentPropertyValues: Record<string, string>
   componentKey: string | null
   sourceLibraryKey: string | null

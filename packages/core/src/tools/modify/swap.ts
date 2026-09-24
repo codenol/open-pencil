@@ -2,9 +2,30 @@ import * as v from 'valibot'
 
 import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
+import { releaseOriginalFigArchive } from '#core/kiwi/fig/session/original-archive'
 import { nodeIdInput } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
-import { releaseOriginalFigArchive } from '#core/kiwi/fig/session/original-archive'
+
+interface VariantValueMap {
+  [key: string]: unknown
+}
+
+function isVariantValueMap(value: unknown): value is VariantValueMap {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function swapResult(
+  id: string,
+  resolved: { componentId: string; componentName: string; variantName?: string }
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {
+    id,
+    componentId: resolved.componentId,
+    componentName: resolved.componentName
+  }
+  if (resolved.variantName) result.variantName = resolved.variantName
+  return result
+}
 
 /**
  * Замена компонента у экземпляра — «swap», как в Figma.
@@ -26,7 +47,10 @@ export const swapComponent = defineTool({
   execution: { kind: 'sync', mutation: 'document' },
   input: v.object({
     id: nodeIdInput,
-    component_id: v.pipe(v.string(), v.description('Component or component set node ID to swap to')),
+    component_id: v.pipe(
+      v.string(),
+      v.description('Component or component set node ID to swap to')
+    ),
     variant_values: v.optional(
       v.pipe(
         v.string(),
@@ -44,7 +68,9 @@ export const swapComponent = defineTool({
       if (instance.componentId) {
         return swapSlotContent(figma.graph, instance, args.component_id, args.variant_values)
       }
-      return { error: `Node "${args.id}" is ${instance.type}, not an instance — swap needs an instance` }
+      return {
+        error: `Node "${args.id}" is ${instance.type}, not an instance — swap needs an instance`
+      }
     }
 
     const resolved = resolveSwapTarget(figma.graph, args.component_id, args.variant_values)
@@ -58,14 +84,10 @@ export const swapComponent = defineTool({
     releaseOriginalFigArchive(figma.graph)
 
     const updated = figma.graph.getNode(args.id)
-    return {
-      id: args.id,
-      componentId: resolved.componentId,
-      componentName: resolved.componentName,
-      ...(resolved.variantName ? { variantName: resolved.variantName } : {}),
-      // Имя могло измениться вместе с компонентом — говорим об этом явно.
-      ...(updated && updated.name !== previousName ? { name: updated.name } : {})
-    }
+    const result = swapResult(args.id, resolved)
+    // Имя могло измениться вместе с компонентом — говорим об этом явно.
+    if (updated && updated.name !== previousName) result.name = updated.name
+    return result
   }
 })
 
@@ -97,6 +119,20 @@ function topInstanceOf(graph: SceneGraph, slotCopy: SceneNode): SceneNode | unde
     current = current.parentId ? graph.getNode(current.parentId) : undefined
   }
   return topInstance
+}
+
+function invalidatedOverrideComponentIds(
+  instance: SceneNode,
+  componentIds: Array<string | null | undefined>
+): string[] {
+  const result = new Set<string>()
+  for (const componentId of instance.invalidatedOverrideComponentIds ?? []) {
+    result.add(componentId)
+  }
+  for (const componentId of componentIds) {
+    if (componentId) result.add(componentId)
+  }
+  return [...result]
 }
 
 /**
@@ -136,12 +172,21 @@ export function clearSlotContent(
   const topInstance = topInstanceOf(graph, slotCopy)
 
   if (topInstance) {
-    const assignments = { ...topInstance.componentPropertyAssignments }
-    delete assignments[slotRef.propertyId]
-    graph.updateNode(topInstance.id, { componentPropertyAssignments: assignments })
+    const previousContentId = topInstance.componentPropertyAssignments[slotRef.propertyId]
+    const assignments = Object.fromEntries(
+      Object.entries(topInstance.componentPropertyAssignments).filter(
+        ([propertyId]) => propertyId !== slotRef.propertyId
+      )
+    )
+    graph.updateNode(topInstance.id, {
+      componentPropertyAssignments: assignments,
+      invalidatedOverrideComponentIds: invalidatedOverrideComponentIds(topInstance, [
+        previousContentId
+      ])
+    })
   }
   // Копия на канвасе и слот мастера: убираем наполнитель, место остаётся.
-  for (const childId of [...slotCopy.childIds]) graph.deleteNode(childId)
+  for (const childId of slotCopy.childIds.slice()) graph.deleteNode(childId)
   releaseOriginalFigArchive(graph)
 
   return { id: slotCopy.id, cleared: true }
@@ -165,9 +210,7 @@ export function swapSlotContent(
   slotCopy: SceneNode,
   componentId: string,
   variantValues?: string
-):
-  | Record<string, unknown>
-  | { error: string } {
+): Record<string, unknown> | { error: string } {
   const slotRef = slotRefOf(graph, slotCopy)
   if (!slotRef) {
     return {
@@ -182,15 +225,12 @@ export function swapSlotContent(
 
   if (!topInstance) {
     // Слот в мастере: наполнение по умолчанию для всех инстансов.
-    for (const childId of [...slotCopy.childIds]) graph.deleteNode(childId)
+    for (const childId of slotCopy.childIds.slice()) graph.deleteNode(childId)
     const placed = graph.createInstance(resolved.componentId, slotCopy.id)
     if (!placed) return { error: `Failed to place "${resolved.componentName}" into the slot` }
     releaseOriginalFigArchive(graph)
     return {
-      id: slotCopy.id,
-      componentId: resolved.componentId,
-      componentName: resolved.componentName,
-      ...(resolved.variantName ? { variantName: resolved.variantName } : {}),
+      ...swapResult(slotCopy.id, resolved),
       note: 'The slot in the master now holds your component as the default content — every instance shows it, and it saves with the file.'
     }
   }
@@ -199,27 +239,27 @@ export function swapSlotContent(
     componentPropertyAssignments: {
       ...topInstance.componentPropertyAssignments,
       [slotRef.propertyId]: resolved.componentId
-    }
+    },
+    invalidatedOverrideComponentIds: invalidatedOverrideComponentIds(topInstance, [
+      topInstance.componentPropertyAssignments[slotRef.propertyId],
+      resolved.componentId
+    ])
   })
   // Копия на канвасе: содержимое места видно сразу. Наполнитель — инстанс
   // внутри копии, ровно как его создаёт импорт из assignment при перечтении
   // файла. Связь копии со своим мастером (componentId) не трогаем: её
   // переключение на наполнитель ломает и вид, и повторные свопы.
-  for (const childId of [...slotCopy.childIds]) graph.deleteNode(childId)
+  for (const childId of slotCopy.childIds.slice()) graph.deleteNode(childId)
   const placed = graph.createInstance(resolved.componentId, slotCopy.id)
   if (!placed) return { error: `Failed to place "${resolved.componentName}" into the slot` }
   releaseOriginalFigArchive(graph)
 
   return {
-    id: slotCopy.id,
+    ...swapResult(slotCopy.id, resolved),
     slotOf: topInstance.id,
-    componentId: resolved.componentId,
-    componentName: resolved.componentName,
-    ...(resolved.variantName ? { variantName: resolved.variantName } : {}),
     note: 'The slot of this one instance now holds your component; the master and other instances are unchanged, and the content saves with the file.'
   }
 }
-
 
 /**
  * Куда менять: сам компонент или нужный вариант сета.
@@ -232,9 +272,7 @@ function resolveSwapTarget(
   graph: SceneGraph,
   componentId: string,
   variantValues?: string
-):
-  | { componentId: string; componentName: string; variantName?: string }
-  | { error: string } {
+): { componentId: string; componentName: string; variantName?: string } | { error: string } {
   const target = graph.getNode(componentId)
   if (!target) return { error: `Component "${componentId}" not found` }
 
@@ -249,11 +287,11 @@ function resolveSwapTarget(
   if (variantValues) {
     try {
       const parsed = JSON.parse(variantValues) as unknown
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      if (!isVariantValueMap(parsed)) {
         return { error: 'variant_values must be a JSON object, e.g. {"Size":"16"}' }
       }
       wanted = Object.fromEntries(
-        Object.entries(parsed as Record<string, unknown>).map(([key, value]) => [key, String(value)])
+        Object.entries(parsed).map(([key, value]) => [key, String(value)])
       )
     } catch {
       return { error: 'variant_values is not valid JSON' }

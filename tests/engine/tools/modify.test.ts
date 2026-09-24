@@ -281,3 +281,40 @@ describe('set_font_range', () => {
     ).toBeCloseTo(1)
   })
 })
+
+describe('swap_component SLOT invalidation', () => {
+  test('marks both the previous and replacement slot-content roots as stale', () => {
+    const { figma, graph } = setupToolTest()
+    const page = graph.getPages()[0]
+    const layout = graph.createNode('COMPONENT', page.id, {
+      componentPropertyDefinitions: [
+        { id: 'prop:slot', name: 'Main', type: 'SLOT', defaultValue: '' }
+      ]
+    })
+    graph.createNode('FRAME', layout.id, {
+      componentPropertyReferences: [{ propertyId: 'prop:slot', field: 'SLOT' }]
+    })
+    const previous = graph.createNode('COMPONENT', page.id, { name: 'Previous' })
+    const replacement = graph.createNode('COMPONENT', page.id, { name: 'Replacement' })
+    const instance = graph.createInstance(layout.id, page.id)
+    if (!instance) throw new Error('failed to create layout instance')
+    const slotCopy = graph.getChildren(instance.id)[0]
+    graph.updateNode(instance.id, {
+      componentPropertyAssignments: { 'prop:slot': previous.id }
+    })
+    const initialContent = graph.createInstance(previous.id, slotCopy.id)
+    if (!initialContent) throw new Error('failed to place initial slot content')
+
+    const result = getTool('swap_component').execute(figma, {
+      id: slotCopy.id,
+      component_id: replacement.id
+    }) as ToolResult
+
+    expect(result.error).toBeUndefined()
+    const updated = getNodeOrThrow(graph, instance.id)
+    expect(updated.componentPropertyAssignments['prop:slot']).toBe(replacement.id)
+    expect(new Set(updated.invalidatedOverrideComponentIds)).toEqual(
+      new Set([previous.id, replacement.id])
+    )
+  })
+})
