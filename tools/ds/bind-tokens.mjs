@@ -109,13 +109,33 @@ function vocabularyOf(paths) {
   return vocabulary
 }
 
+/**
+ * Значения вариантов, которые в токенах названы иначе: `Checked=yes` — это
+ * `checked`, `Checked=no` — `unchecked`. Ключ — «свойство=значение».
+ */
+const DIMENSION_ALIASES = {
+  'checked=yes': 'checked',
+  'checked=no': 'unchecked',
+  'text=yes': 'text',
+  'text=no': 'icon',
+  'type=base': 'primary',
+  'type=alternate': 'primary-alternate'
+}
+
+function slugOf(value) {
+  return value.trim().toLowerCase().replaceAll(' ', '-').replaceAll('_', '-')
+}
+
 /** Размерности варианта: значения свойств, которые есть в путях токенов. */
 function variantDimensions(variantName, vocabulary) {
   const dimensions = []
   for (const part of variantName.split(',')) {
-    const raw = part.includes('=') ? part.slice(part.indexOf('=') + 1) : part
-    const slug = raw.trim().toLowerCase().replaceAll(' ', '-').replaceAll('_', '-')
+    if (!part.includes('=')) continue
+    const [key, value] = part.split('=')
+    const slug = slugOf(value)
     if (slug && vocabulary.has(slug)) dimensions.push(slug)
+    const alias = DIMENSION_ALIASES[`${slugOf(key)}=${slug}`]
+    if (alias && vocabulary.has(alias)) dimensions.push(alias)
   }
   return dimensions
 }
@@ -241,40 +261,78 @@ function statsOf(namespace) {
   return stats
 }
 
-function bindNode(node, namespace, dimensions, role, field) {
-  const stats = statsOf(namespace)
+/**
+ * Пробует привязать одно свойство. Возвращает исход, но в отчёт пишет только
+ * вызывающий: у ребёнка ролей несколько, и «не нашлось» по первой из них ещё
+ * не значит, что узел остался без токена.
+ */
+function bindProperty(node, namespace, dimensions, role, field) {
   const paint = field.startsWith('strokes') ? (node.strokes ?? [])[0] : (node.fills ?? [])[0]
   const color = paint?.color
-  if (!color) {
-    stats.unresolved += 1
-    return
-  }
+  if (!color) return { outcome: 'none', role, color: null }
   const found = findToken(namespace, dimensions, role, node.__state, color)
-  if (!found) {
-    stats.unresolved += 1
-    unresolved.push(
-      `${namespace}: ${node.name.trim().slice(0, 32)} → ${role}/${node.__state} (${hex(color)})`
-    )
-    return
-  }
-  if (typeof found !== 'string') {
-    stats.ambiguous += 1
-    ambiguous.push(
-      `${namespace}: ${node.name.trim().slice(0, 32)} → ${role}: ${found.candidates.slice(0, 3).join(' | ')}`
-    )
-    return
-  }
+  if (!found) return { outcome: 'none', role, color }
+  if (typeof found !== 'string') return { outcome: 'ambiguous', role, color, candidates: found.candidates }
   const variable = variablesByName.get(found)
-  if (!variable) {
-    stats.unresolved += 1
-    unresolved.push(`${namespace}: ${found} — нет такой переменной`)
-    return
-  }
+  if (!variable) return { outcome: 'none', role, color }
   if (output) graph.bindVariable(node.id, field, variable.id)
   bound += 1
-  stats.bound += 1
   if (examples.length < limit) {
     examples.push(`${node.name.trim().slice(0, 44)} → ${role} = ${found}`)
+  }
+  return { outcome: 'bound', role, color, token: found }
+}
+
+/** Пишет исход в отчёт по компоненту. */
+function record(namespace, node, result) {
+  const stats = statsOf(namespace)
+  if (result.outcome === 'bound') {
+    stats.bound += 1
+    return
+  }
+  if (result.outcome === 'ambiguous') {
+    stats.ambiguous += 1
+    ambiguous.push(
+      `${namespace}: ${node.name.trim().slice(0, 32)} → ${result.role}: ${result.candidates.slice(0, 3).join(' | ')}`
+    )
+    return
+  }
+  stats.unresolved += 1
+  unresolved.push(
+    `${namespace}: ${node.name.trim().slice(0, 32)} → ${result.role}/${node.__state} (${hex(result.color)})`
+  )
+}
+
+/**
+ * Роли детей: у текста это `text`, у копии — сначала `icon`, но копия бывает и
+ * контейнером (`Drawer header`), поэтому пробуем и роли фона, и толщины.
+ */
+const CHILD_FILL_ROLES = {
+  TEXT: ['text'],
+  INSTANCE: ['icon', 'background', 'thumb'],
+  FRAME: ['background'],
+  ROUNDED_RECTANGLE: ['background']
+}
+
+function bindChildren(parent, namespace, dimensions, depth = 0) {
+  if (depth > 1) return
+  for (const child of graph.getChildren(parent.id) ?? []) {
+    child.__state = parent.__state
+    if ((child.fills ?? []).length > 0) {
+      // Роли перебираем по порядку и останавливаемся на первой осмысленной:
+      // если у роли нашлись токены (пусть и неоднозначные) — дальше не ищем.
+      const roles = CHILD_FILL_ROLES[child.type] ?? ['background']
+      let result = null
+      for (const role of roles) {
+        result = bindProperty(child, namespace, dimensions, role, 'fills/0/color')
+        if (result.outcome !== 'none') break
+      }
+      if (result) record(namespace, child, result)
+    }
+    if ((child.strokes ?? []).length > 0) {
+      record(namespace, child, bindProperty(child, namespace, dimensions, 'border', 'strokes/0/color'))
+    }
+    bindChildren(child, namespace, dimensions, depth + 1)
   }
 }
 
@@ -289,20 +347,12 @@ for (const set of sets) {
     variant.__state = stateOf(variant.name, vocabulary)
     const dimensions = variantDimensions(variant.name, vocabulary)
     if ((variant.fills ?? []).length > 0) {
-      bindNode(variant, namespace, dimensions, 'background', 'fills/0/color')
+      record(namespace, variant, bindProperty(variant, namespace, dimensions, 'background', 'fills/0/color'))
     }
     if ((variant.strokes ?? []).length > 0) {
-      bindNode(variant, namespace, dimensions, 'border', 'strokes/0/color')
+      record(namespace, variant, bindProperty(variant, namespace, dimensions, 'border', 'strokes/0/color'))
     }
-    for (const child of graph.getChildren(variant.id) ?? []) {
-      child.__state = variant.__state
-      if (child.type === 'TEXT' && (child.fills ?? []).length > 0) {
-        bindNode(child, namespace, dimensions, 'text', 'fills/0/color')
-      }
-      if (child.type === 'INSTANCE' && (child.fills ?? []).length > 0) {
-        bindNode(child, namespace, dimensions, 'icon', 'fills/0/color')
-      }
-    }
+    bindChildren(variant, namespace, dimensions)
   }
 }
 
