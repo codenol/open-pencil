@@ -60,3 +60,15 @@ describe('app font loading', () => {
     }
   })
 })
+
+describe('bundled design-system fonts', () => {
+  test('Roboto ships with the app in the faces the design system uses', async () => {
+    for (const name of ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+      const file = Bun.file(repoPath(`public/Roboto-${name}.ttf`))
+      expect(await file.exists()).toBe(true)
+      const head = new Uint8Array(await file.slice(0, 4).arrayBuffer())
+      // sfnt-подпись: файл действительно шрифт, а не заглушка.
+      expect([...head]).toEqual([0x00, 0x01, 0x00, 0x00])
+    }
+  })
+})
