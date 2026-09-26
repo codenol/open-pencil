@@ -65,5 +65,8 @@ export {
   type ScreenTemplateColumn,
   type ScreenTemplateSlot,
   type ScreenTemplateMeaning,
+  type ScreenTemplateVariantSpec,
+  findVariantByValues,
+  variantForSense,
   type ResolvedScreenTemplate
 } from './screen-template'
