@@ -3,9 +3,10 @@ import type { SceneNode } from '@open-pencil/scene-graph'
 import * as v from 'valibot'
 
 import type { FigmaAPI } from '#core/figma-api'
-import { nodeIdInput } from '#core/tools/input'
+import { nodeIdInput, toolNumber } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
 import {
+  clearScreenTemplate,
   readScreenTemplate,
   resolveScreenTemplate,
   screenTemplateFrames
@@ -88,6 +89,68 @@ export const getScreenTemplate = defineTool({
     for (const key of ['purpose', 'use', 'avoid', 'zones', 'statuses', 'badges', 'allowed', 'forbidden', 'checks', 'issues'] as const) {
       const value = template[key]
       if (value !== undefined) answer[key] = value
+    }
+    return answer
+  }
+})
+
+export const insertScreenTemplate = defineTool({
+  name: 'insert_screen_template',
+  description:
+    'Insert a copy of a screen template as a new screen: the copy keeps every instance, its overrides and its filled slots, so the screen looks like the template and stays editable. The copy is not a template itself — it is a screen built from one. Read the template with get_screen_template first, then fill the copy by setting the text of its cells.',
+  execution: { kind: 'sync', mutation: 'document' },
+  input: v.object({
+    id: nodeIdInput,
+    parent_id: v.optional(
+      v.pipe(v.string(), v.description('Page or frame to place the screen into. Default: current page'))
+    ),
+    name: v.optional(v.pipe(v.string(), v.description('Name for the new screen'))),
+    offset: v.optional(
+      toolNumber(
+        v.pipe(
+          v.number(),
+          v.description('Distance to the right of the template. Default: template width plus 80')
+        )
+      )
+    )
+  }),
+  execute: (figma, { id, parent_id, name, offset }) => {
+    const node = figma.graph.getNode(id)
+    if (!node) return { error: `Node "${id}" not found` }
+    const source = node.type === 'FRAME' ? node : ancestorFrame(figma, id)
+    if (!source) return { error: `Node "${id}" is not inside a screen template` }
+    const template = readScreenTemplate(figma.graph, source.id)
+    if (!template) return { error: `Frame "${source.name.trim()}" carries no screen template` }
+
+    const parentId = parent_id ?? figma.currentPageId
+    const parent = figma.graph.getNode(parentId)
+    if (!parent) return { error: `Parent "${parentId}" not found` }
+    const samePage = parentId === source.parentId
+    const x = samePage ? Math.round(source.x + source.width + (offset ?? 80)) : Math.round(source.x)
+    const y = Math.round(source.y)
+    const clone = figma.graph.cloneTree(source.id, parentId, {
+      name: name ?? source.name.trim().replace(/^Эталон · /, ''),
+      x,
+      y
+    })
+    if (!clone) return { error: `Failed to copy "${source.name.trim()}"` }
+
+    // Копия — экран, а не образец: разбор с неё снимаем, иначе она попадёт в
+    // список эталонов и следующий ассистент возьмёт за образец уже собранный
+    // экран.
+    const resolved = resolveScreenTemplate(figma.graph, clone.id)
+    clearScreenTemplate(figma.graph, clone.id)
+    const answer: Record<string, unknown> = {
+      id: clone.id,
+      name: clone.name.trim(),
+      x,
+      y,
+      next: 'Fill the copy: set the text of the cell textId for each field, pick status and badge variants by meaning, repeat the row pattern for more records. The template rules still apply to this screen.'
+    }
+    if (resolved) {
+      answer.columns = resolved.columns
+      answer.rows = { count: resolved.rows.length, ids: resolved.rows.map((row) => row.id) }
+      answer.slots = resolved.slots
     }
     return answer
   }

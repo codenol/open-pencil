@@ -87,3 +87,36 @@ describe('screen template reaches the assistant', () => {
     expect(result.found).toBe(false)
   })
 })
+
+describe('a screen built from a template', () => {
+  test('insert_screen_template copies the screen and drops the template mark', () => {
+    const { figma, graph, frameId } = setupTemplate()
+    const page = graph.getPages()[0]
+
+    const result = getTool('insert_screen_template').execute(figma, {
+      id: frameId,
+      name: 'Отчёт по прошивкам'
+    }) as ToolResult
+
+    expect(result.error).toBeUndefined()
+    expect(result.name).toBe('Отчёт по прошивкам')
+    const copy = graph.getNode(result.id as string)
+    expect(copy?.parentId).toBe(page.id)
+    // Копия — экран, а не образец: в списке эталонов её быть не должно.
+    expect(readScreenTemplate(graph, result.id as string)).toBeNull()
+    const listed = getTool('list_screen_templates').execute(figma, {}) as ToolResult
+    expect(listed.count).toBe(1)
+    // Строение копии совпадает с образцом.
+    const rows = result.rows as { count: number }
+    expect(rows.count).toBe(1)
+  })
+
+  test('a node without a template cannot be inserted as a screen', () => {
+    const { figma, graph } = setupToolTest()
+    const frame = graph.createNode('FRAME', graph.getPages()[0].id, { name: 'Просто кадр' })
+
+    const result = getTool('insert_screen_template').execute(figma, { id: frame.id }) as ToolResult
+
+    expect(result.error).toBeDefined()
+  })
+})

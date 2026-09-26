@@ -181,6 +181,17 @@ export function writeScreenTemplate(
   })
 }
 
+/** Снять разбор с кадра: копия эталона — экран, а не образец. */
+export function clearScreenTemplate(graph: SceneGraph, nodeId: string): void {
+  const node = graph.getNode(nodeId)
+  if (!node) return
+  const rest = node.pluginData.filter(
+    (item) => !(item.pluginId === TEMPLATE_PLUGIN_ID && item.key === TEMPLATE_KEY)
+  )
+  if (rest.length === node.pluginData.length) return
+  graph.updateNode(nodeId, { pluginData: rest })
+}
+
 /** Кадры-эталоны документа: у каждого есть разбор. */
 export function screenTemplateFrames(graph: SceneGraph): SceneNode[] {
   const frames: SceneNode[] = []

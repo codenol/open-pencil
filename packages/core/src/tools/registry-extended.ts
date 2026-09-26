@@ -57,6 +57,7 @@ import {
   pageBounds,
   queryNodes,
   getScreenTemplate,
+  insertScreenTemplate,
   listScreenTemplates,
   selectNodes,
   switchPage
@@ -129,6 +130,7 @@ export const EXTENDED_TOOLS: ToolDef[] = [
   switchPage,
   listScreenTemplates,
   getScreenTemplate,
+  insertScreenTemplate,
   pageBounds,
   getFontStatus,
   listFonts,
