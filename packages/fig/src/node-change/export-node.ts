@@ -6,7 +6,11 @@ import type {
   SceneGraph,
   SceneNode
 } from '@open-pencil/scene-graph'
-import { DEFAULT_STROKE_MITER_LIMIT, forEachInstanceOverride } from '@open-pencil/scene-graph'
+import {
+  DEFAULT_STROKE_MITER_LIMIT,
+  forEachInstanceOverride,
+  getInstanceOverride
+} from '@open-pencil/scene-graph'
 import type { Color, GUID, Matrix, Vector } from '@open-pencil/scene-graph/primitives'
 
 import { effectiveFigmaRawNodeFields, effectiveFigmaSourcePayload } from '../source-metadata'
@@ -489,6 +493,92 @@ function resolveOverrideTargetGuid(
   return overrideGuid ?? getOrCreateNodeGuid(context, sourceId, localIdCounter)
 }
 
+
+/**
+ * Подмена вложенного инстанса — записью в symbolOverrides.
+ *
+ * Содержимое инстанса в файл не пишется: оно приходит из мастера. Поэтому
+ * вложенный инстанс, у которого сменился компонент (иконка, цвет бейджа,
+ * смысл статуса), сам по себе до файла не доедет — на канвасе своп виден, а
+ * после переоткрытия пропадает. Пишем его так же, как текст и заливку:
+ * путь из узлов мастера и ссылка на новый компонент.
+ *
+ * Содержимое мест пропускаем: оно задаётся назначением свойства, а не свопом.
+ */
+/** Есть ли над узлом инстанс: тогда его свопы пишет внешний инстанс, не он сам. */
+function hasInstanceAncestor(graph: SceneGraph, node: SceneNode): boolean {
+  let current = node.parentId ? graph.getNode(node.parentId) : undefined
+  while (current) {
+    if (current.type === 'INSTANCE') return true
+    current = current.parentId ? graph.getNode(current.parentId) : undefined
+  }
+  return false
+}
+
+/**
+ * Свопы вложенных инстансов этого узла.
+ *
+ * Пишем только с самого внешнего инстанса цепочки: у копий внутри инстанса
+ * своего содержимого в файле нет, поэтому их свопы едут в записях внешнего.
+ * Иначе один и тот же своп записывался бы на каждом уровне и файл пух.
+ */
+function collectSwapOverrides(
+  context: SceneNodeToKiwiContext,
+  instance: SceneNode,
+  localIdCounter: { value: number }
+): KiwiSymbolOverridePayload[] {
+  const result: KiwiSymbolOverridePayload[] = []
+  if (hasInstanceAncestor(context.graph, instance)) return result
+  const seen = new Set<string>()
+  const root = instance.componentId ? context.graph.getNode(instance.componentId) : undefined
+  if (!root) return result
+
+  const visit = (parent: SceneNode, masterParent: SceneNode, ancestorGuids: GUID[]): void => {
+    for (const childId of parent.childIds) {
+      const child = context.graph.getNode(childId)
+      if (!child) continue
+      // Место наполняется назначением: его содержимое не своп.
+      if (child.componentPropertyReferences.some((ref) => ref.field === 'SLOT')) continue
+
+      const index = parent.childIds.indexOf(childId)
+      const masterId = getInstanceOverride(
+        parent.instanceOverrides,
+        parent.id,
+        childId,
+        'sourceComponentId'
+      )
+      const master =
+        (typeof masterId === 'string' ? context.graph.getNode(masterId) : undefined) ??
+        (masterParent.childIds[index] ? context.graph.getNode(masterParent.childIds[index]) : undefined)
+      if (!master) continue
+
+      const masterGuid = getOrCreateNodeGuid(context, master.id, localIdCounter)
+      const guids = masterGuid ? [...ancestorGuids, masterGuid] : ancestorGuids
+
+      // Сравниваем компоненты, а не ссылки: у копии ссылка ведёт на узел
+      // мастера, и без приведения она всегда «отличается».
+      if (child.type === 'INSTANCE' && child.componentId && master.type === 'INSTANCE' && master.componentId) {
+        const childComponent = resolveInstanceComponentId(context, child.componentId)
+        const masterComponent = resolveInstanceComponentId(context, master.componentId)
+        const toGuid =
+          childComponent === masterComponent
+            ? undefined
+            : getOrCreateNodeGuid(context, childComponent, localIdCounter)
+        const pathKey = guids.map((guid) => `${guid.sessionID}:${guid.localID}`).join('/')
+        if (toGuid && guids.length > 0 && !seen.has(pathKey)) {
+          seen.add(pathKey)
+          result.push({ guidPath: { guids }, overriddenSymbolID: toGuid })
+        }
+      }
+
+      if (child.childIds.length > 0) visit(child, master, guids)
+    }
+  }
+
+  visit(instance, root, [])
+  return result
+}
+
 function serializeFillOverrides(
   context: SceneNodeToKiwiContext,
   instance: SceneNode,
@@ -744,6 +834,7 @@ function applyInstancePayload(
     }
     mergeOverrides(symbolOverrides, serializeTextOverrides(context, node, localIdCounter))
     mergeOverrides(symbolOverrides, serializeFillOverrides(context, node, localIdCounter))
+    mergeOverrides(symbolOverrides, collectSwapOverrides(context, node, localIdCounter))
     if (symbolOverrides.length > 0) symbolData.symbolOverrides = symbolOverrides
     if (node.source.fig.uniformScaleFactor != null) {
       symbolData.uniformScaleFactor = node.source.fig.uniformScaleFactor
