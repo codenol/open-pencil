@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Read assembled screens as templates: the assistant lists a document's screen templates and reads one screen's purpose, zones, columns with their data fields, the meaning-to-variant dictionary for statuses and badges, its slots and its checks, then fills a screen from the template instead of assembling the same layout again.
+
 ## 0.15.1 — 2026-09-18
 
 ### Added
