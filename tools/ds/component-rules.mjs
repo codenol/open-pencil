@@ -874,6 +874,53 @@ const graph = corePkg.importNodeChanges(parsed.nodeChanges, parsed.blobs, new Ma
   populate: 'none'
 })
 
+/**
+ * Базовое правило для мастера, которому не написали своё.
+ *
+ * Ничего не выдумывает: назначение — из имени, «когда брать» — из вариантов,
+ * которые у мастера действительно есть, остальное — общие требования системы.
+ */
+function basicRules(master, graph) {
+  const name = master.name.trim()
+  const isSet = master.type === 'COMPONENT_SET'
+  const variants = (master.componentPropertyDefinitions ?? [])
+    .filter((definition) => definition.type === 'VARIANT' && (definition.variantValues ?? []).length > 0)
+    .map((definition) => `${definition.name}: ${definition.variantValues.slice(0, 6).join(', ')}`)
+  const count = isSet ? (graph.getChildren(master.id) ?? []).length : 0
+  return rule({
+    purpose: isSet
+      ? `Набор вариантов «${name}»${count > 0 ? `, вариантов ${count}` : ''}.`
+      : `Компонент системы «${name}».`,
+    use: [
+      'Брать готовый компонент, а не рисовать то же самое заново.',
+      ...(variants.length > 0 ? [`Вариант выбирать по назначению — ${variants.join('; ')}.`] : []),
+      'Менять текст и выбирать вариант; размеры и структуру оставлять как в мастере.'
+    ],
+    avoid: ['Не собирать компонент заново из фреймов.'],
+    allowed: ['Менять текст и выбирать вариант.']
+  })
+}
+
+/** Страница мастера: по ней видно семейство, если у набора нет своего имени в правилах. */
+function pageNameOf(node) {
+  let current = node
+  while (current) {
+    if (current.type === 'CANVAS') return current.name.trim().toLowerCase()
+    current = current.parentId ? graph.getNode(current.parentId) : undefined
+  }
+  return ''
+}
+
+/** Одиночная иконка: маленькая фигура без текста внутри. */
+function isIconMaster(master, graph) {
+  if (master.width > 48 || master.height > 48) return false
+  const children = graph.getChildren(master.id) ?? []
+  if (children.some((child) => child.type === 'TEXT')) return false
+  return children.some((child) =>
+    ['BOOLEAN_OPERATION', 'VECTOR', 'ELLIPSE', 'LINE', 'ROUNDED_RECTANGLE'].includes(child.type)
+  )
+}
+
 // Правила пишем и наборам вариантов, и одиночным компонентам. Вариант внутри
 // набора не считаем мастером: правила набора читаются и с его вариантов.
 const sets = [...graph.nodes.values()].filter(
@@ -909,11 +956,54 @@ for (const [name, rules] of Object.entries(RULES_BY_MASTER)) {
   }
 }
 
-// Что осталось без правил
+// Второй проход: мастера без своего правила получают базовое — семейства по
+// странице, иконки по виду, остальные по имени и вариантам.
 const covered = new Set(Object.keys(RULES_BY_MASTER))
-const uncovered = [...byName.keys()].filter((name) => !covered.has(name))
+const tierCounts = { family: 0, icon: 0, basic: 0 }
+for (const masters of byName.values()) {
+  for (const master of masters) {
+    const name = master.name.trim()
+    if (covered.has(name)) continue
+    const page = pageNameOf(master)
+    const family = Object.keys(RULES_BY_MASTER).find(
+      (key) => key.toLowerCase() === page && key !== name
+    )
+    let tier = 'basic'
+    let rules
+    if (family) {
+      rules = RULES_BY_MASTER[family]
+      tier = 'family'
+    } else if (isIconMaster(master, graph)) {
+      rules = ICON_RULES
+      tier = 'icon'
+    } else {
+      rules = basicRules(master, graph)
+    }
+    const entry = { pluginId: PLUGIN_ID, key: RULES_KEY, value: JSON.stringify(rules) }
+    const rest = master.pluginData.filter(
+      (item) => !(item.pluginId === PLUGIN_ID && item.key === RULES_KEY)
+    )
+    graph.updateNode(master.id, { pluginData: [...rest, entry] })
+    tierCounts[tier] += 1
+    written += 1
+  }
+}
+
+// После второго прохода без правил не должен остаться никто.
+const uncovered = []
+for (const masters of byName.values()) {
+  for (const master of masters) {
+    const hasRules = (master.pluginData ?? []).some(
+      (item) => item.pluginId === PLUGIN_ID && item.key === RULES_KEY
+    )
+    if (!hasRules) uncovered.push(master.name.trim())
+  }
+}
 
 console.log(`правила записаны: ${written} мастеров`)
+console.log(
+  `  базовые: ${tierCounts.basic} (остальные — по семейству страницы: ${tierCounts.family}, иконкам: ${tierCounts.icon})`
+)
 if (missing.length) console.log(`в правилах есть, в файле нет: ${missing.join(', ')}`)
 if (uncovered.length) console.log(`без правил осталось (${uncovered.length}): ${uncovered.join(', ')}`)
 
