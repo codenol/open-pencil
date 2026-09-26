@@ -37,6 +37,13 @@ const BUNDLED_FONTS: Record<string, string> = {
   'Inter|SemiBold': '/Inter-SemiBold.ttf',
   'Inter|Bold': '/Inter-Bold.ttf',
   'Inter|ExtraBold': '/Inter-ExtraBold.ttf',
+  // Roboto — шрифт дизайн-системы: без него документ подменялся на Inter и
+  // переставал быть верным. Четыре начертания, которые встречаются в файле.
+  // Лицензия рядом: public/Roboto-OFL.txt.
+  'Roboto|Regular': '/Roboto-Regular.ttf',
+  'Roboto|Medium': '/Roboto-Medium.ttf',
+  'Roboto|SemiBold': '/Roboto-SemiBold.ttf',
+  'Roboto|Bold': '/Roboto-Bold.ttf',
   'Noto Naskh Arabic|Regular': '/NotoNaskhArabic-Regular.ttf'
 }
 
