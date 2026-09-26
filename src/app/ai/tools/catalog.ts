@@ -21,7 +21,12 @@ const defaultNames = new Set([
   'swap_component',
   'swap_component_size',
   'list_icons',
-  'get_default_variant'
+  'get_default_variant',
+  // Эталоны: без них ассистент собирает типовой экран заново и по-своему,
+  // хотя в документе лежит собранный образец с разбором и проверками.
+  'list_screen_templates',
+  'get_screen_template',
+  'insert_screen_template'
 ])
 
 export const aiToolDefinitions = ALL_TOOLS.filter((tool) => isToolExposed(tool, 'ai'))
