@@ -48,3 +48,16 @@ export {
 } from './slot-property'
 export { swapSlotContent, getSlotContentId, clearSlotContent } from './modify/swap'
 export { releaseOriginalFigArchive } from '../kiwi/fig/session/original-archive'
+export {
+  readScreenTemplate,
+  writeScreenTemplate,
+  resolveScreenTemplate,
+  screenTemplateFrames,
+  TEMPLATE_KEY,
+  TEMPLATE_PLUGIN_ID,
+  type ScreenTemplate,
+  type ScreenTemplateColumn,
+  type ScreenTemplateSlot,
+  type ScreenTemplateMeaning,
+  type ResolvedScreenTemplate
+} from './screen-template'

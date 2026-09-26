@@ -56,6 +56,8 @@ import {
   listPages,
   pageBounds,
   queryNodes,
+  getScreenTemplate,
+  listScreenTemplates,
   selectNodes,
   switchPage
 } from './read'
@@ -125,6 +127,8 @@ export const EXTENDED_TOOLS: ToolDef[] = [
   insertLibraryComponent,
   getDefaultVariant,
   switchPage,
+  listScreenTemplates,
+  getScreenTemplate,
   pageBounds,
   getFontStatus,
   listFonts,

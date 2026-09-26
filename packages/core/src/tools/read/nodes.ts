@@ -4,6 +4,7 @@ import type { SceneGraph, SceneNode } from '@open-pencil/scene-graph'
 
 import type { FigmaNodeProxy } from '#core/figma-api'
 import { readComponentRules, type ComponentRules } from '#core/tools/component-rules'
+import { readScreenTemplate, type ScreenTemplate } from '#core/tools/screen-template'
 import { toolNumber, nodeIdInput } from '#core/tools/input'
 import { defineTool, nodeSummary, nodeToResult } from '#core/tools/schema'
 
@@ -119,14 +120,20 @@ export const getNode = defineTool({
     // сразу, а не после вставки — иначе он идёт выяснять строение сам.
     const rules = componentRulesFor(figma.graph, raw)
     const withRules = rules ? { ...result, rules } : result
+    // Разбор эталона едет с кадром: по нему ассистент собирает экран этого
+    // типа, не разбирая сборку заново и не выдумывая правила.
+    const template = raw?.type === 'FRAME' ? readScreenTemplate(figma.graph, raw.id) : null
+    const withTemplate: typeof withRules & { template?: ScreenTemplate } = template
+      ? { ...withRules, template }
+      : withRules
     const variants = raw?.childIds.length ?? 0
     if (variants > VARIANT_WARNING_THRESHOLD) {
       return {
-        ...withRules,
+        ...withTemplate,
         note: `Children shown to depth ${depth ?? DEFAULT_NODE_DEPTH}. This node holds ${variants} children — pass depth for more, or search variants instead of reading them all.`
       }
     }
-    return withRules
+    return withTemplate
   }
 })
 
