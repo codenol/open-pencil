@@ -22,6 +22,7 @@ import {
   insertIcon,
   searchIconsTool
 } from './create'
+import { fillScreenTemplate } from './modify/fill-template'
 import {
   setBlend,
   setConstraints,
@@ -130,6 +131,7 @@ export const EXTENDED_TOOLS: ToolDef[] = [
   switchPage,
   listScreenTemplates,
   getScreenTemplate,
+  fillScreenTemplate,
   insertScreenTemplate,
   pageBounds,
   getFontStatus,

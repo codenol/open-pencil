@@ -6,10 +6,10 @@ import type { FigmaAPI } from '#core/figma-api'
 import { nodeIdInput, toolNumber } from '#core/tools/input'
 import { defineTool } from '#core/tools/schema'
 import {
-  clearScreenTemplate,
   readScreenTemplate,
   resolveScreenTemplate,
-  screenTemplateFrames
+  screenTemplateFrames,
+  writeScreenTemplate
 } from '#core/tools/screen-template'
 
 /**
@@ -135,11 +135,11 @@ export const insertScreenTemplate = defineTool({
     })
     if (!clone) return { error: `Failed to copy "${source.name.trim()}"` }
 
-    // Копия — экран, а не образец: разбор с неё снимаем, иначе она попадёт в
-    // список эталонов и следующий ассистент возьмёт за образец уже собранный
-    // экран.
+    // Копия — экран, а не образец, но правила эталона ей нужны: по ним её
+    // наполняют и проверяют. Поэтому разбор переносим, пометив источником —
+    // в списке эталонов такой экран не появится.
     const resolved = resolveScreenTemplate(figma.graph, clone.id)
-    clearScreenTemplate(figma.graph, clone.id)
+    writeScreenTemplate(figma.graph, clone.id, { ...template, derivedFrom: source.id })
     const answer: Record<string, unknown> = {
       id: clone.id,
       name: clone.name.trim(),

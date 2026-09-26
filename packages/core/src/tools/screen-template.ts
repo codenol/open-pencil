@@ -30,18 +30,29 @@ export interface ScreenTemplateColumn {
   title: string
   field?: string
   width: number
-  kind: 'text' | 'badge' | 'status' | 'check' | 'empty'
+  /** Вид ячейки. Объявленный в разборе важнее выведенного из образца. */
+  kind?: 'text' | 'badge' | 'status' | 'check' | 'empty'
   headerVariant?: string
   cellVariant?: string
+}
+
+/** Вариант компонента: набор значений свойств. */
+export interface ScreenTemplateVariantSpec {
+  component: string
+  values: Record<string, string>
 }
 
 /** Смысл и вариант, который ему соответствует. */
 export interface ScreenTemplateMeaning {
   sense: string
-  variant: string
+  /** Вариант, которым смысл выражается. Строка — заметка для человека. */
+  variant?: ScreenTemplateVariantSpec | string
+  note?: string
 }
 
 export interface ScreenTemplateLayout {
+  /** Заголовок экрана: узел, который меняют при сборке нового экрана. */
+  title?: string
   /** Имя ряда-образца и шаблон имён ячеек: «Ячейка 1.1». */
   headerRow?: string
   rowPattern?: string
@@ -50,6 +61,8 @@ export interface ScreenTemplateLayout {
 }
 
 export interface ScreenTemplate {
+  /** Экран, собранный из эталона: сам эталоном не считается, но правила несёт. */
+  derivedFrom?: string
   purpose?: string
   use?: string[]
   avoid?: string[]
@@ -89,17 +102,56 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
+function isVariantSpec(value: unknown): value is ScreenTemplateVariantSpec {
+  return (
+    isRecord(value) &&
+    typeof value.component === 'string' &&
+    isRecord(value.values)
+  )
+}
+
 function isMeaningArray(value: unknown): value is ScreenTemplateMeaning[] {
   return (
     Array.isArray(value) &&
-    value.every(
-      (item) =>
-        item !== null &&
-        typeof item === 'object' &&
-        typeof (item as ScreenTemplateMeaning).sense === 'string' &&
-        typeof (item as ScreenTemplateMeaning).variant === 'string'
-    )
+    value.every((item) => isRecord(item) && typeof item.sense === 'string')
   )
+}
+
+/**
+ * Вариант набора по значениям свойств: «Severity=success, Content=text-only».
+ * Возвращает компонент варианта — тот, который ставят свопом.
+ */
+export function findVariantByValues(
+  graph: SceneGraph,
+  setName: string,
+  values: Record<string, string>
+): SceneNode | null {
+  const wanted = Object.entries(values)
+  for (const node of graph.getAllNodes()) {
+    if (node.type !== 'COMPONENT') continue
+    if (node.parentId) {
+      const set = graph.getNode(node.parentId)
+      if (set?.type === 'COMPONENT_SET') {
+        const current = node.componentPropertyValues
+        if (set.name.trim() !== setName) continue
+        if (wanted.every(([key, value]) => current[key] === value)) return node
+      }
+    }
+  }
+  return null
+}
+
+/** Вариант по смыслу: «хорошо» → набор значений из разбора эталона. */
+export function variantForSense(
+  meanings: ScreenTemplateMeaning[] | undefined,
+  sense: string
+): ScreenTemplateVariantSpec | null {
+  const wanted = sense.trim().toLowerCase()
+  for (const meaning of meanings ?? []) {
+    if (meaning.sense.trim().toLowerCase() !== wanted) continue
+    if (meaning.variant && typeof meaning.variant === 'object') return meaning.variant
+  }
+  return null
 }
 
 function isColumnArray(value: unknown): value is ScreenTemplateColumn[] {
@@ -132,11 +184,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+/** Смыслы со значениями варианта: строку-заметку оставляем, мусор отбрасываем. */
+function parseMeanings(value: unknown): ScreenTemplateMeaning[] | undefined {
+  if (!isMeaningArray(value)) return undefined
+  return value.filter(
+    (meaning) =>
+      meaning.variant === undefined ||
+      typeof meaning.variant === 'string' ||
+      isVariantSpec(meaning.variant)
+  )
+}
+
 function parse(value: string): ScreenTemplate | null {
   try {
     const source: unknown = JSON.parse(value)
     if (!isRecord(source)) return null
     const template: ScreenTemplate = {}
+    if (typeof source.derivedFrom === 'string') template.derivedFrom = source.derivedFrom
     if (typeof source.purpose === 'string') template.purpose = source.purpose
     for (const key of STRING_LIST_KEYS) {
       const list = source[key]
@@ -144,8 +208,10 @@ function parse(value: string): ScreenTemplate | null {
     }
     if (isColumnArray(source.columns)) template.columns = source.columns
     if (isSlotArray(source.slots)) template.slots = source.slots
-    if (isMeaningArray(source.statuses)) template.statuses = source.statuses
-    if (isMeaningArray(source.badges)) template.badges = source.badges
+    const statuses = parseMeanings(source.statuses)
+    if (statuses) template.statuses = statuses
+    const badges = parseMeanings(source.badges)
+    if (badges) template.badges = badges
     if (isRecord(source.layout)) template.layout = source.layout
     return template
   } catch {
@@ -181,23 +247,16 @@ export function writeScreenTemplate(
   })
 }
 
-/** Снять разбор с кадра: копия эталона — экран, а не образец. */
-export function clearScreenTemplate(graph: SceneGraph, nodeId: string): void {
-  const node = graph.getNode(nodeId)
-  if (!node) return
-  const rest = node.pluginData.filter(
-    (item) => !(item.pluginId === TEMPLATE_PLUGIN_ID && item.key === TEMPLATE_KEY)
-  )
-  if (rest.length === node.pluginData.length) return
-  graph.updateNode(nodeId, { pluginData: rest })
-}
-
-/** Кадры-эталоны документа: у каждого есть разбор. */
+/**
+ * Кадры-эталоны документа: у каждого есть разбор.
+ * Экраны, собранные из эталона, в список не попадают — они не образцы.
+ */
 export function screenTemplateFrames(graph: SceneGraph): SceneNode[] {
   const frames: SceneNode[] = []
   for (const node of graph.getAllNodes()) {
     if (node.type !== 'FRAME') continue
-    if (readScreenTemplate(graph, node.id)) frames.push(node)
+    const template = readScreenTemplate(graph, node.id)
+    if (template && !template.derivedFrom) frames.push(node)
   }
   return frames
 }
@@ -227,7 +286,7 @@ export interface ResolvedColumn {
   index: number
   title: string
   field?: string
-  kind: ScreenTemplateColumn['kind']
+  kind: NonNullable<ScreenTemplateColumn['kind']>
   width: number
   headerCellId: string | null
   headerTextId: string | null
@@ -270,7 +329,10 @@ function childByName(graph: SceneGraph, node: SceneNode, name: string): SceneNod
 }
 
 /** Вид ячейки по варианту её мастера: текст, бейдж, статус, галочка, пусто. */
-function kindOfCell(graph: SceneGraph, cell: SceneNode): ScreenTemplateColumn['kind'] {
+function kindOfCell(
+  graph: SceneGraph,
+  cell: SceneNode
+): NonNullable<ScreenTemplateColumn['kind']> {
   const master = cell.componentId ? graph.getNode(cell.componentId) : undefined
   const content = master?.componentPropertyValues.Content ?? ''
   if (content.startsWith('Badge')) return 'badge'
@@ -306,7 +368,7 @@ export function resolveScreenTemplate(
     const sample = rows[0] ? childByName(graph, rows[0], `Ячейка 1.${index}`) : undefined
     return sample ? Math.round(sample.width) : 0
   }
-  const kindOf = (index: number): ScreenTemplateColumn['kind'] => {
+  const kindOf = (index: number): NonNullable<ScreenTemplateColumn['kind']> => {
     const sample = rows[0] ? childByName(graph, rows[0], `Ячейка 1.${index}`) : undefined
     return sample ? kindOfCell(graph, sample) : 'text'
   }
@@ -317,7 +379,7 @@ export function resolveScreenTemplate(
     const resolved: ResolvedColumn = {
       index: column.index,
       title: column.title,
-      kind: kindOf(column.index),
+      kind: column.kind ?? kindOf(column.index),
       width: widthOf(column.index),
       headerCellId: cell?.id ?? null,
       headerTextId: text?.id ?? null

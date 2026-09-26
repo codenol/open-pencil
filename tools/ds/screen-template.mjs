@@ -48,24 +48,44 @@ const COLUMNS = [
   { index: 10, kind: 'empty' }
 ]
 
-/** Смысл → вариант: состояние берут смыслом, цвет приходит с вариантом. */
+/**
+ * Смысл → вариант: состояние берут смыслом, цвет приходит с вариантом.
+ * Значения варианта записаны точно, чтобы наполнение ставило их свопом,
+ * а не подбирало на глаз.
+ */
+const STATUS_BASE = { component: '✅status', values: { Content: 'text-only', Size: 'Ladge', Outline: 'no' } }
 const STATUSES = [
-  { sense: 'хорошо', variant: '✅status: Severity=success, Content=text-only, Size=Ladge, Outline=no' },
-  { sense: 'предупреждение', variant: '✅status: Severity=degradation (жёлтый), Severity=warning (оранжевый)' },
-  { sense: 'ошибка', variant: '✅status: Severity=critical' },
-  { sense: 'нет данных или выключено', variant: '✅status: Severity=stop' },
-  { sense: 'в работе, новое', variant: '✅status: Severity=additional, new, load' },
-  { sense: 'выбрано', variant: 'Checkbox: State=Default, Checked=Yes, Text=No' },
-  { sense: 'выбрано частично', variant: 'Checkbox: State=Default, Checked=Indeterminate, Text=No' }
+  { sense: 'хорошо', variant: { ...STATUS_BASE, values: { ...STATUS_BASE.values, Severity: 'success' } } },
+  { sense: 'предупреждение', variant: { ...STATUS_BASE, values: { ...STATUS_BASE.values, Severity: 'degradation' } } },
+  { sense: 'оранжевое предупреждение', variant: { ...STATUS_BASE, values: { ...STATUS_BASE.values, Severity: 'warning' } } },
+  { sense: 'ошибка', variant: { ...STATUS_BASE, values: { ...STATUS_BASE.values, Severity: 'critical' } } },
+  { sense: 'нет данных', variant: { ...STATUS_BASE, values: { ...STATUS_BASE.values, Severity: 'stop' } } },
+  { sense: 'в работе', variant: { ...STATUS_BASE, values: { ...STATUS_BASE.values, Severity: 'additional' } } },
+  { sense: 'новое', variant: { ...STATUS_BASE, values: { ...STATUS_BASE.values, Severity: 'new' } } },
+  {
+    sense: 'выбрано',
+    variant: { component: 'Checkbox', values: { State: 'Default', Checked: 'Yes', Text: 'No' } }
+  },
+  {
+    sense: 'выбрано частично',
+    variant: { component: 'Checkbox', values: { State: 'Default', Checked: 'Indeterminate', Text: 'No' } }
+  },
+  {
+    sense: 'не выбрано',
+    variant: { component: 'Checkbox', values: { State: 'Default', Checked: 'No', Text: 'No' } }
+  }
 ]
 
 const BADGES = [
-  { sense: 'нейтрально', variant: 'badge: Color=gray, Content=Text only' },
-  { sense: 'внимание', variant: 'badge: Color=yellow, orange' },
-  { sense: 'ошибка', variant: 'badge: Color=rose, red' },
-  { sense: 'служебное', variant: 'badge: Color=violet, nile-blue' },
-  { sense: 'норма', variant: 'badge: Color=green, shamrock' },
-  { sense: 'информация', variant: 'badge: Color=cornflower-blue, bondi-blue, java' }
+  { sense: 'нейтрально', variant: { component: 'badge', values: { Color: 'gray', Content: 'Text only' } } },
+  { sense: 'внимание', variant: { component: 'badge', values: { Color: 'yellow', Content: 'Text only' } } },
+  { sense: 'ошибка', variant: { component: 'badge', values: { Color: 'rose', Content: 'Text only' } } },
+  { sense: 'служебное', variant: { component: 'badge', values: { Color: 'violet', Content: 'Text only' } } },
+  { sense: 'норма', variant: { component: 'badge', values: { Color: 'green', Content: 'Text only' } } },
+  {
+    sense: 'информация',
+    variant: { component: 'badge', values: { Color: 'cornflower-blue', Content: 'Text only' } }
+  }
 ]
 
 const TEMPLATE = {
@@ -120,6 +140,7 @@ const TEMPLATE = {
   statuses: STATUSES,
   badges: BADGES,
   layout: {
+    title: 'Заголовок',
     headerRow: 'Шапка таблицы',
     rowPattern: 'Строка N',
     cellPattern: 'Ячейка N.M',
@@ -214,6 +235,7 @@ writeScreenTemplate(graph, frame.id, template)
 const resolved = resolveScreenTemplate(graph, frame.id)
 console.log(`эталон: ${frame.name.trim()} (${Math.round(frame.width)}x${Math.round(frame.height)})`)
 console.log(`колонки: ${resolved.columns.map((c) => `${c.index}. ${c.title}${c.field ? ` → ${c.field}` : ''}`).join(' | ')}`)
+console.log(`словарь: статусов ${TEMPLATE.statuses.length} (со значениями вариантов: ${TEMPLATE.statuses.filter((item) => typeof item.variant === 'object').length}), бейджей ${TEMPLATE.badges.length}`)
 console.log(`ряды: ${resolved.rows.length}; места: ${slots.map((s) => `${s.name} → ${s.blockName}`).join(', ')}`)
 const empty = resolved.columns.filter((column) => column.kind === 'text' && !column.field)
 if (empty.length) console.log(`внимание: без поля остались колонки ${empty.map((c) => c.index).join(', ')}`)

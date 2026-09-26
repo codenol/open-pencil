@@ -26,7 +26,8 @@ const defaultNames = new Set([
   // хотя в документе лежит собранный образец с разбором и проверками.
   'list_screen_templates',
   'get_screen_template',
-  'insert_screen_template'
+  'insert_screen_template',
+  'fill_screen_template'
 ])
 
 export const aiToolDefinitions = ALL_TOOLS.filter((tool) => isToolExposed(tool, 'ai'))
