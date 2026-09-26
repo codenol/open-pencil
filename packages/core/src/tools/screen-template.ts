@@ -50,9 +50,21 @@ export interface ScreenTemplateMeaning {
   note?: string
 }
 
+export interface ScreenTemplateStage {
+  /** Размер кадра экрана. */
+  width: number
+  height: number
+  /** Сколько ширины остаётся под таблицу: кадр минус сайдбар и отступы. */
+  contentWidth: number
+  /** Сколько из неё занимают колонки эталона. */
+  columnBudget: number
+}
+
 export interface ScreenTemplateLayout {
   /** Заголовок экрана: узел, который меняют при сборке нового экрана. */
   title?: string
+  /** Кадр экрана и бюджет ширины под таблицу. */
+  stage?: ScreenTemplateStage
   /** Имя ряда-образца и шаблон имён ячеек: «Ячейка 1.1». */
   headerRow?: string
   rowPattern?: string

@@ -42,10 +42,8 @@ const COLUMNS = [
   { index: 4, field: 'model', kind: 'text' },
   { index: 5, field: 'value', kind: 'badge' },
   { index: 6, field: 'node', kind: 'text' },
-  { index: 7, field: 'nodeModel', kind: 'text' },
-  { index: 8, field: 'module', kind: 'text' },
-  { index: 9, field: 'status', kind: 'status' },
-  { index: 10, kind: 'empty' }
+  { index: 7, field: 'status', kind: 'status' },
+  { index: 8, kind: 'empty' }
 ]
 
 /**
@@ -123,6 +121,7 @@ const TEMPLATE = {
   ],
   checks: [
     'Все подписи заполнены, заготовок нет.',
+    'Сумма ширин колонок не больше бюджета ширины: колонки, которые не влезают, сокращают, а не выносят за кадр.',
     'Число ячеек в ряду равно числу колонок; ширины шапки и ячеек совпадают.',
     'Состояния и метки взяты вариантами наборов, цвета и отступы — токенами.',
     'Рядов столько, сколько данных; пустых колонок нет.',
@@ -141,6 +140,8 @@ const TEMPLATE = {
   badges: BADGES,
   layout: {
     title: 'Заголовок',
+    // Проставляется при записи: размер кадра и бюджет ширины под таблицу.
+    stage: { width: 0, height: 0, contentWidth: 0, columnBudget: 0 },
     headerRow: 'Шапка таблицы',
     rowPattern: 'Строка N',
     cellPattern: 'Ячейка N.M',
@@ -227,13 +228,39 @@ function collectSlots() {
 }
 
 const slots = collectSlots()
-const template = { ...TEMPLATE, columns, slots }
+
+// Бюджет ширины: кадр минус сайдбар, внешние отступы и паддинги контента.
+// Ассистент должен знать его до того, как начнёт менять колонки.
+const sidebar = kids(frame).find((child) => child.name.trim() === 'Сайдбар')
+const content = kids(frame).find((child) => child.name.trim() === 'Контент')
+const padding = content ? content.paddingLeft + content.paddingRight : 0
+const gaps = content && sidebar ? 16 : 0
+const contentWidth = Math.round(frame.width - (sidebar?.width ?? 0) - padding - gaps)
+const columnBudget = columns.reduce((sum, column) => sum + column.width, 0)
+if (columnBudget > contentWidth) {
+  console.log(`внимание: колонки шире бюджета (${columnBudget} > ${contentWidth})`)
+}
+
+const template = {
+  ...TEMPLATE,
+  columns,
+  slots,
+  layout: {
+    ...TEMPLATE.layout,
+    stage: {
+      width: Math.round(frame.width),
+      height: Math.round(frame.height),
+      contentWidth,
+      columnBudget
+    }
+  }
+}
 writeScreenTemplate(graph, frame.id, template)
 
 // ── Проверка: разбор читается и сходится со сборкой ───────────────────────
 
 const resolved = resolveScreenTemplate(graph, frame.id)
-console.log(`эталон: ${frame.name.trim()} (${Math.round(frame.width)}x${Math.round(frame.height)})`)
+console.log(`эталон: ${frame.name.trim()} (${Math.round(frame.width)}x${Math.round(frame.height)}), под таблицу ${contentWidth} px, колонки занимают ${columnBudget} px`)
 console.log(`колонки: ${resolved.columns.map((c) => `${c.index}. ${c.title}${c.field ? ` → ${c.field}` : ''}`).join(' | ')}`)
 console.log(`словарь: статусов ${TEMPLATE.statuses.length} (со значениями вариантов: ${TEMPLATE.statuses.filter((item) => typeof item.variant === 'object').length}), бейджей ${TEMPLATE.badges.length}`)
 console.log(`ряды: ${resolved.rows.length}; места: ${slots.map((s) => `${s.name} → ${s.blockName}`).join(', ')}`)

@@ -81,6 +81,7 @@ export const getScreenTemplate = defineTool({
       id: resolved.frame.id,
       name: resolved.frame.name,
       size: { width: resolved.frame.width, height: resolved.frame.height },
+      ...(resolved.template.layout?.stage ? { stage: resolved.template.layout.stage } : {}),
       columns: resolved.columns,
       rows,
       slots: resolved.slots,
@@ -151,6 +152,7 @@ export const insertScreenTemplate = defineTool({
       answer.columns = resolved.columns
       answer.rows = { count: resolved.rows.length, ids: resolved.rows.map((row) => row.id) }
       answer.slots = resolved.slots
+      if (resolved.template.layout?.stage) answer.stage = resolved.template.layout.stage
     }
     return answer
   }

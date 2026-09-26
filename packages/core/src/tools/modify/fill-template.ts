@@ -37,7 +37,7 @@ const rowInput = v.record(
 export const fillScreenTemplate = defineTool({
   name: 'fill_screen_template',
   description:
-    'Fill a screen built from a template with data in one call. Give the rows as objects keyed by the template fields (the same keys get_screen_template returns for the columns), and optionally rename columns and set the screen title. Text columns take the value as text; status and badge columns take a meaning from the template dictionary, or «meaning|caption» to set the caption too; checkbox columns take yes, no or indeterminate. The row pattern is repeated or trimmed to match the number of rows you pass.',
+    'Fill a screen built from a template with data in one call. Give the rows as objects keyed by the template fields (the same keys get_screen_template returns for the columns), and optionally rename columns and set the screen title. Text columns take the value as text; status and badge columns take a meaning from the template dictionary, or «meaning|caption» to set the caption too; checkbox columns take yes, no or indeterminate. The row pattern is repeated or trimmed to match the number of rows you pass. Renaming columns does not change their widths: keep their sum inside the stage contentWidth get_screen_template reports, or the table runs past the frame.',
   execution: { kind: 'sync', mutation: 'document' },
   input: v.object({
     id: nodeIdInput,
