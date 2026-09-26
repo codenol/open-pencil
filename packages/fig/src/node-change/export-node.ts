@@ -832,9 +832,11 @@ function applyInstancePayload(
         )
       )
     }
+    // Порядок важен: своп пересобирает содержимое вложенного инстанса, поэтому
+    // идёт первым — иначе стирает подписи и заливки, записанные до него.
+    mergeOverrides(symbolOverrides, collectSwapOverrides(context, node, localIdCounter))
     mergeOverrides(symbolOverrides, serializeTextOverrides(context, node, localIdCounter))
     mergeOverrides(symbolOverrides, serializeFillOverrides(context, node, localIdCounter))
-    mergeOverrides(symbolOverrides, collectSwapOverrides(context, node, localIdCounter))
     if (symbolOverrides.length > 0) symbolData.symbolOverrides = symbolOverrides
     if (node.source.fig.uniformScaleFactor != null) {
       symbolData.uniformScaleFactor = node.source.fig.uniformScaleFactor
