@@ -143,6 +143,15 @@ export { useVariables } from '#vue/variables/use'
 export { useVariablesDialogState } from '#vue/variables/dialog/use'
 export { useVariablesEditor } from '#vue/variables/editor/use'
 export { useVariablesTable } from '#vue/variables/table/use'
+export {
+  buildVariableRows,
+  groupPathOf,
+  groupPathsOf,
+  leafNameOf,
+  type VariableGroupRow,
+  type VariableItemRow,
+  type VariableRow
+} from '#vue/variables/table/grouping'
 export { usePageList } from '#vue/primitives/PageList/usePageList'
 export {
   fillCategory,

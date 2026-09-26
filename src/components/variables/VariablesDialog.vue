@@ -27,6 +27,8 @@ import IconHash from '~icons/lucide/hash'
 import IconPalette from '~icons/lucide/palette'
 import IconToggleLeft from '~icons/lucide/toggle-left'
 import IconType from '~icons/lucide/type'
+import IconChevronRight from '~icons/lucide/chevron-right'
+import IconFolder from '~icons/lucide/folder'
 import IconX from '~icons/lucide/x'
 
 import type { VariableType } from '@open-pencil/scene-graph'
@@ -86,7 +88,9 @@ const ctx = useVariablesEditor({
   colorInput: ColorInput,
   icons: variableTypeIcons,
   fallbackIcon: IconToggleLeft,
-  deleteIcon: IconX
+  deleteIcon: IconX,
+  groupIcon: IconFolder,
+  chevronIcon: IconChevronRight
 })
 const collectionInput = templateRef<HTMLInputElement>('collectionInput')
 const modeInput = templateRef<HTMLInputElement>('modeInput')
@@ -349,7 +353,8 @@ function resizeHandleClass(resizing: boolean) {
                 <tr
                   v-for="row in ctx.table.getRowModel().rows"
                   :key="row.id"
-                  data-test-id="variable-row"
+                  :data-test-id="row.original.kind === 'group' ? 'variable-group-row' : 'variable-row'"
+                  :data-row-kind="row.original.kind"
                   :class="tableStyles.row()"
                 >
                   <td
