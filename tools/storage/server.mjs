@@ -34,6 +34,19 @@ const DIRS = {
 
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,180}$/
 
+/**
+ * Время изменения документа — самое позднее из записанного в метаданных и
+ * времени файла. Файл могли заменить мимо сервиса (скриптом, копированием), и
+ * тогда метка метаданных осталась бы старой: клиент с локальной копией счёл бы
+ * свою версию свежее серверной и записал бы её поверх.
+ */
+function newestTimestamp(metaUpdatedAt, fileMtime) {
+  const fromFile = fileMtime ? new Date(fileMtime).toISOString() : null
+  if (!metaUpdatedAt) return fromFile
+  if (!fromFile) return metaUpdatedAt
+  return String(metaUpdatedAt) > fromFile ? String(metaUpdatedAt) : fromFile
+}
+
 function send(res, status, body, headers = {}) {
   res.writeHead(status, {
     'access-control-allow-origin': '*',
@@ -97,7 +110,7 @@ async function listDocuments() {
       id,
       name: meta.name ?? id,
       kind: meta.kind ?? 'design',
-      updatedAt: meta.updatedAt ?? info?.mtime?.toISOString() ?? null,
+      updatedAt: newestTimestamp(meta.updatedAt, info?.mtime),
       size: info?.size ?? null,
       hasThumbnail: await fileExists(join(DIRS.thumbs, `${id}.png`))
     })
@@ -175,7 +188,9 @@ const server = createServer(async (req, res) => {
       if (req.method === 'GET') {
         const meta = await readMeta(id)
         if (!meta) return sendJson(res, 404, { error: 'not found' })
-        return sendJson(res, 200, { id, kind: meta.kind ?? 'design', ...meta })
+        const info = await stat(join(DIRS.files, `${id}.fig`)).catch(() => null)
+        const updatedAt = newestTimestamp(meta.updatedAt, info?.mtime)
+        return sendJson(res, 200, { id, kind: meta.kind ?? 'design', ...meta, updatedAt })
       }
 
       // Смена типа файла: макет ↔ библиотека. Меняет адрес файла.

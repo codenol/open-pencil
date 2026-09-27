@@ -13,6 +13,10 @@
 - Accept spacing, gaps and corner radius bound to a variable in the `consistent-spacing` and `consistent-radius` rules, so a value taken from the library's own scale is no longer reported as off-scale.
 - Read the numeric scale from the document's `space/…` and `radius/…` variables in those rules, so a step defined in the library counts even before it is bound.
 
+### Fixed
+
+- Report a stored document's newest modification time from the document storage service, using the file's own timestamp when it is later than the recorded one, so a client holding a local copy notices a file replaced outside the service instead of overwriting it with the stale version.
+
 ## 0.15.1 — 2026-09-18
 
 ### Added
