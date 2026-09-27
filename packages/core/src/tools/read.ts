@@ -6,4 +6,9 @@ export { diffJSX, getJSX } from './read/jsx'
 export { findNodes, getNode, getPageTree } from './read/nodes'
 export { getCurrentPage, listPages, pageBounds, switchPage } from './read/pages'
 export { queryNodes } from './read/query'
+export {
+  getScreenTemplate,
+  insertScreenTemplate,
+  listScreenTemplates
+} from './read/screen-templates'
 export { getSelection, selectNodes } from './read/selection'

@@ -47,4 +47,26 @@ export {
   type SlotPropertyResult
 } from './slot-property'
 export { swapSlotContent, getSlotContentId, clearSlotContent } from './modify/swap'
-export { releaseOriginalFigArchive } from '../kiwi/fig/session/original-archive'
+export { releaseOriginalFigArchive } from '#core/kiwi/fig/session/original-archive'
+export {
+  getScreenTemplate,
+  insertScreenTemplate,
+  listScreenTemplates
+} from './read/screen-templates'
+export { fillScreenTemplate } from './modify/fill-template'
+export {
+  readScreenTemplate,
+  writeScreenTemplate,
+  resolveScreenTemplate,
+  screenTemplateFrames,
+  TEMPLATE_KEY,
+  TEMPLATE_PLUGIN_ID,
+  type ScreenTemplate,
+  type ScreenTemplateColumn,
+  type ScreenTemplateSlot,
+  type ScreenTemplateMeaning,
+  type ScreenTemplateVariantSpec,
+  findVariantByValues,
+  variantForSense,
+  type ResolvedScreenTemplate
+} from './screen-template'
