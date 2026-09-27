@@ -126,4 +126,41 @@ describe('unbound spacing and radius are reported as token debt', () => {
     const graph = new SceneGraph()
     expect(lint(graph, frameWithPadding(graph, 0))).not.toContain('no-hardcoded-spacing')
   })
+
+  test('a padding inside a component copy is not debt', () => {
+    const graph = new SceneGraph()
+    const page = graph.getPages()[0]
+    const instance = graph.createNode('INSTANCE', page.id, {
+      name: 'Card copy',
+      width: 200,
+      height: 80
+    })
+    const inner = graph.createNode('FRAME', instance.id, {
+      name: 'Inner',
+      width: 100,
+      height: 40,
+      layoutMode: 'VERTICAL',
+      paddingLeft: 16
+    })
+
+    expect(lint(graph, inner.id)).not.toContain('no-hardcoded-spacing')
+  })
+
+  test('a radius inside a component copy is not debt', () => {
+    const graph = new SceneGraph()
+    const page = graph.getPages()[0]
+    const instance = graph.createNode('INSTANCE', page.id, {
+      name: 'Card copy',
+      width: 200,
+      height: 80
+    })
+    const inner = graph.createNode('RECTANGLE', instance.id, {
+      name: 'Inner',
+      width: 40,
+      height: 40,
+      cornerRadius: 8
+    })
+
+    expect(lint(graph, inner.id)).not.toContain('no-hardcoded-radius')
+  })
 })

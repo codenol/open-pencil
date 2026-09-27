@@ -51,7 +51,7 @@ export class Linter {
     this.scales.clear()
     this.graph = graph
     const roots = rootIds && rootIds.length > 0 ? rootIds : graph.getPages().map((p) => p.id)
-    for (const id of roots) this.capture(graph, id, undefined)
+    for (const id of roots) this.capture(graph, id, this.captureAncestors(graph, id))
     for (const id of roots) this.lintNode(id)
     return {
       messages: this.messages,
@@ -83,6 +83,30 @@ export class Linter {
     }
     this.scales.set(group, values)
     return values
+  }
+
+  /**
+   * Родители корневого узла: правило должно видеть, что узел лежит внутри
+   * копии компонента, даже когда линтуют выделение, а не всю страницу.
+   * Сами родители при этом не проверяются.
+   */
+  private captureAncestors(graph: SceneGraph, id: string): LintNode | undefined {
+    const chain: SceneNode[] = []
+    let raw = graph.getNode(id)
+    while (raw?.parentId) {
+      const parent = graph.getNode(raw.parentId)
+      if (!parent) break
+      chain.unshift(parent)
+      raw = parent
+    }
+    let parent: LintNode | undefined
+    for (const ancestor of chain) {
+      const existing = this.nodes.get(ancestor.id) ?? this.toLintNode(ancestor)
+      existing.parent = parent
+      this.nodes.set(ancestor.id, existing)
+      parent = existing
+    }
+    return parent
   }
 
   private capture(graph: SceneGraph, id: string, parent?: LintNode) {

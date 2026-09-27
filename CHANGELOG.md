@@ -12,6 +12,7 @@
 
 - Accept spacing, gaps and corner radius bound to a variable in the `consistent-spacing` and `consistent-radius` rules, so a value taken from the library's own scale is no longer reported as off-scale.
 - Read the numeric scale from the document's `space/…` and `radius/…` variables in those rules, so a step defined in the library counts even before it is bound.
+- Count the `no-hardcoded-spacing` and `no-hardcoded-radius` debt once per master instead of once per copy: a component copy inherits its master's bindings, so reporting it again only multiplied the number.
 
 ## 0.15.1 — 2026-09-18
 

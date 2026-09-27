@@ -1,5 +1,5 @@
 import { defineRule } from '#core/lint/rule'
-import { SPACING_FIELDS } from '#core/lint/utils'
+import { isInsideInstance, SPACING_FIELDS } from '#core/lint/utils'
 
 export default defineRule({
   meta: {
@@ -10,6 +10,8 @@ export default defineRule({
   match: ['FRAME', 'COMPONENT'],
   check(node, context) {
     if (node.layoutMode === 'NONE') return
+    // Копия наследует привязки мастера — долг считается по мастеру.
+    if (isInsideInstance(node)) return
     for (const { field, label } of SPACING_FIELDS) {
       const value = node[field]
       // Ноль — это отсутствие отступа, токен ему не нужен.

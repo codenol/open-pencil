@@ -1,4 +1,5 @@
 import { defineRule } from '#core/lint/rule'
+import { isInsideInstance } from '#core/lint/utils'
 
 export default defineRule({
   meta: {
@@ -8,6 +9,8 @@ export default defineRule({
   },
   match: ['RECTANGLE', 'FRAME', 'COMPONENT', 'INSTANCE'],
   check(node, context) {
+    // Копия наследует привязки мастера — долг считается по мастеру.
+    if (isInsideInstance(node)) return
     // Ноль — это отсутствие скругления, токен ему не нужен.
     if (node.cornerRadius <= 0) return
     if (node.boundVariables.cornerRadius) return

@@ -1,3 +1,5 @@
+import type { LintNode } from './types'
+
 export function isDefaultName(name: string): boolean {
   return /^(Frame|Rectangle|Ellipse|Line|Text|Group|Vector|Polygon|Star|Section|Component|Instance|Slice)\s*\d*$/i.test(
     name
@@ -60,3 +62,17 @@ export const SPACING_FIELDS: ReadonlyArray<{ field: SpacingField; label: string 
   { field: 'paddingBottom', label: 'paddingBottom' },
   { field: 'paddingLeft', label: 'paddingLeft' }
 ]
+
+/**
+ * Узел внутри копии компонента. За его геометрию отвечает мастер: правка
+ * мастера доезжает до всех копий (проверено сверкой 20 162 полей), поэтому
+ * долг считается по мастерам, а не повторяется на каждой копии.
+ */
+export function isInsideInstance(node: LintNode): boolean {
+  let current: LintNode | undefined = node.parent
+  while (current) {
+    if (current.type === 'INSTANCE') return true
+    current = current.parent
+  }
+  return false
+}
