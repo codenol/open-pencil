@@ -63,6 +63,8 @@ export interface ScreenTemplateStage {
 export interface ScreenTemplateLayout {
   /** Заголовок экрана: узел, который меняют при сборке нового экрана. */
   title?: string
+  /** Панель управления экраном: слева поиск и фильтры, справа кнопки. */
+  controlPanel?: string
   /** Кадр экрана и бюджет ширины под таблицу. */
   stage?: ScreenTemplateStage
   /** Имя ряда-образца и шаблон имён ячеек: «Ячейка 1.1». */
