@@ -18,6 +18,8 @@ export class Linter {
   private ruleConfigs = new Map<string, { severity: Severity; options?: Record<string, unknown> }>()
   private messages: LintMessage[] = []
   private nodes = new Map<string, LintNode>()
+  private scales = new Map<string, ReadonlySet<number>>()
+  private graph: SceneGraph | null = null
 
   constructor(options: { config?: LintConfig; preset?: string; rules?: string[] } = {}) {
     let baseConfig: Record<
@@ -46,6 +48,8 @@ export class Linter {
   lintGraph(graph: SceneGraph, rootIds?: string[]): LintResult {
     this.messages = []
     this.nodes.clear()
+    this.scales.clear()
+    this.graph = graph
     const roots = rootIds && rootIds.length > 0 ? rootIds : graph.getPages().map((p) => p.id)
     for (const id of roots) this.capture(graph, id, undefined)
     for (const id of roots) this.lintNode(id)
@@ -55,6 +59,30 @@ export class Linter {
       warningCount: this.messages.filter((m) => m.severity === 'warning').length,
       infoCount: this.messages.filter((m) => m.severity === 'info').length
     }
+  }
+
+  /**
+   * Ступени числовой шкалы документа: значения FLOAT-переменных, чьё имя или
+   * коллекция начинаются с группы (`space`, `radius`). Так правило читает ту
+   * шкалу, которую завели в библиотеке, а не зашитый в коде список.
+   */
+  private numericScale(group: string): ReadonlySet<number> {
+    const cached = this.scales.get(group)
+    if (cached) return cached
+    const values = new Set<number>()
+    const wanted = group.toLowerCase()
+    for (const variable of this.graph?.variables.values() ?? []) {
+      if (variable.type !== 'FLOAT') continue
+      const collection = this.graph?.variableCollections.get(variable.collectionId)
+      const name = variable.name.trim().toLowerCase()
+      const collectionName = collection?.name.trim().toLowerCase() ?? ''
+      if (!name.startsWith(`${wanted}/`) && collectionName !== wanted) continue
+      const value = variable.valuesByMode[collection?.defaultModeId ?? '']
+      const resolved = typeof value === 'number' ? value : Object.values(variable.valuesByMode)[0]
+      if (typeof resolved === 'number') values.add(resolved)
+    }
+    this.scales.set(group, values)
+    return values
   }
 
   private capture(graph: SceneGraph, id: string, parent?: LintNode) {
@@ -134,7 +162,8 @@ export class Linter {
         getChildren: (node) =>
           node.childIds
             .map((childId) => this.nodes.get(childId))
-            .filter((child): child is LintNode => !!child)
+            .filter((child): child is LintNode => !!child),
+        numericScale: (group) => this.numericScale(group)
       }
       rule.check(node, context)
     }

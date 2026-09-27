@@ -8,6 +8,8 @@ export interface Preset {
 export const recommended: Preset = {
   rules: {
     'no-hardcoded-colors': 'warning',
+    'no-hardcoded-spacing': 'warning',
+    'no-hardcoded-radius': 'warning',
     'no-default-names': 'info',
     'prefer-auto-layout': 'info',
     'consistent-spacing': 'warning',
@@ -38,6 +40,8 @@ export const accessibility: Preset = {
     'touch-target-size': 'error',
     'min-text-size': 'error',
     'no-hardcoded-colors': 'off',
+    'no-hardcoded-spacing': 'off',
+    'no-hardcoded-radius': 'off',
     'no-default-names': 'off',
     'prefer-auto-layout': 'off',
     'consistent-spacing': 'off',

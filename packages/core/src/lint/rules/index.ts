@@ -1,4 +1,6 @@
 export { default as noHardcodedColors } from './no-hardcoded-colors'
+export { default as noHardcodedSpacing } from './no-hardcoded-spacing'
+export { default as noHardcodedRadius } from './no-hardcoded-radius'
 export { default as noDefaultNames } from './no-default-names'
 export { default as preferAutoLayout } from './prefer-auto-layout'
 export { default as consistentSpacing } from './consistent-spacing'
@@ -29,6 +31,8 @@ import noDetachedInstances from './no-detached-instances'
 import noEmptyFrames from './no-empty-frames'
 import noGroups from './no-groups'
 import noHardcodedColors from './no-hardcoded-colors'
+import noHardcodedRadius from './no-hardcoded-radius'
+import noHardcodedSpacing from './no-hardcoded-spacing'
 import noHiddenLayers from './no-hidden-layers'
 import noMixedStyles from './no-mixed-styles'
 import pixelPerfect from './pixel-perfect'
@@ -38,6 +42,8 @@ import touchTargetSize from './touch-target-size'
 
 export const allRules: Record<string, Rule> = {
   'no-hardcoded-colors': noHardcodedColors,
+  'no-hardcoded-spacing': noHardcodedSpacing,
+  'no-hardcoded-radius': noHardcodedRadius,
   'no-default-names': noDefaultNames,
   'prefer-auto-layout': preferAutoLayout,
   'consistent-spacing': consistentSpacing,

@@ -2,23 +2,27 @@ import { describe, expect, test } from 'bun:test'
 
 import { SceneGraph, createLinter } from '@open-pencil/core'
 
-function addScaleVariable(graph: SceneGraph, id: string, value: number): void {
-  graph.addCollection({
-    id: 'scale',
-    name: 'Scale',
-    modes: [{ modeId: 'value', name: 'Value' }],
-    defaultModeId: 'value',
-    variableIds: []
-  })
+function addFloatVariable(graph: SceneGraph, name: string, value: number): string {
+  const id = `VariableID:scale/${name}`
+  if (!graph.variableCollections.has('scale')) {
+    graph.addCollection({
+      id: 'scale',
+      name: 'Шкала',
+      modes: [{ modeId: 'value', name: 'Value' }],
+      defaultModeId: 'value',
+      variableIds: []
+    })
+  }
   graph.addVariable({
     id,
-    name: `space/${value}`,
+    name,
     type: 'FLOAT',
     collectionId: 'scale',
     valuesByMode: { value },
     description: '',
     hiddenFromPublishing: false
   })
+  return id
 }
 
 function lint(graph: SceneGraph, nodeId: string): string[] {
@@ -27,64 +31,99 @@ function lint(graph: SceneGraph, nodeId: string): string[] {
     .messages.map((message) => message.ruleId)
 }
 
-describe('spacing and radius respect variable bindings', () => {
-  test('reports an off-scale padding that has no token', () => {
-    const graph = new SceneGraph()
-    const page = graph.getPages()[0]
-    const frame = graph.createNode('FRAME', page.id, {
-      name: 'Card',
-      width: 200,
-      height: 80,
-      layoutMode: 'VERTICAL',
-      paddingLeft: 10
-    })
+function frameWithPadding(graph: SceneGraph, paddingLeft: number): string {
+  const page = graph.getPages()[0]
+  return graph.createNode('FRAME', page.id, {
+    name: 'Card',
+    width: 200,
+    height: 80,
+    layoutMode: 'VERTICAL',
+    paddingLeft
+  }).id
+}
 
-    expect(lint(graph, frame.id)).toContain('consistent-spacing')
+function boxWithRadius(graph: SceneGraph, cornerRadius: number): string {
+  const page = graph.getPages()[0]
+  const frame = graph.createNode('FRAME', page.id, { name: 'Card', width: 200, height: 80 })
+  return graph.createNode('RECTANGLE', frame.id, {
+    name: 'Box',
+    width: 40,
+    height: 40,
+    cornerRadius
+  }).id
+}
+
+describe('token-bound values pass the scale rules', () => {
+  test('an off-scale padding without a token is reported', () => {
+    const graph = new SceneGraph()
+    expect(lint(graph, frameWithPadding(graph, 10))).toContain('consistent-spacing')
   })
 
-  test('stays quiet when the same padding is bound to a token', () => {
+  test('the same padding stays quiet once bound to a token', () => {
     const graph = new SceneGraph()
-    const page = graph.getPages()[0]
-    const frame = graph.createNode('FRAME', page.id, {
-      name: 'Card',
-      width: 200,
-      height: 80,
-      layoutMode: 'VERTICAL',
-      paddingLeft: 10
-    })
-    addScaleVariable(graph, 'VariableID:scale/space/10', 10)
-    graph.bindVariable(frame.id, 'paddingLeft', 'VariableID:scale/space/10')
+    const frameId = frameWithPadding(graph, 10)
+    graph.bindVariable(frameId, 'paddingLeft', addFloatVariable(graph, 'space/10', 10))
 
-    expect(lint(graph, frame.id)).not.toContain('consistent-spacing')
+    const ruleIds = lint(graph, frameId)
+    expect(ruleIds).not.toContain('consistent-spacing')
+    expect(ruleIds).not.toContain('no-hardcoded-spacing')
   })
 
-  test('reports an off-scale radius that has no token', () => {
+  test('an off-scale radius without a token is reported', () => {
     const graph = new SceneGraph()
-    const page = graph.getPages()[0]
-    const frame = graph.createNode('FRAME', page.id, { name: 'Card', width: 200, height: 80 })
-    const box = graph.createNode('RECTANGLE', frame.id, {
-      name: 'Box',
-      width: 40,
-      height: 40,
-      cornerRadius: 11
-    })
-
-    expect(lint(graph, box.id)).toContain('consistent-radius')
+    expect(lint(graph, boxWithRadius(graph, 11))).toContain('consistent-radius')
   })
 
-  test('stays quiet when the same radius is bound to a token', () => {
+  test('the same radius stays quiet once bound to a token', () => {
     const graph = new SceneGraph()
-    const page = graph.getPages()[0]
-    const frame = graph.createNode('FRAME', page.id, { name: 'Card', width: 200, height: 80 })
-    const box = graph.createNode('RECTANGLE', frame.id, {
-      name: 'Box',
-      width: 40,
-      height: 40,
-      cornerRadius: 11
-    })
-    addScaleVariable(graph, 'VariableID:scale/radius/12', 12)
-    graph.bindVariable(box.id, 'cornerRadius', 'VariableID:scale/radius/12')
+    const boxId = boxWithRadius(graph, 11)
+    graph.bindVariable(boxId, 'cornerRadius', addFloatVariable(graph, 'radius/12', 12))
 
-    expect(lint(graph, box.id)).not.toContain('consistent-radius')
+    const ruleIds = lint(graph, boxId)
+    expect(ruleIds).not.toContain('consistent-radius')
+    expect(ruleIds).not.toContain('no-hardcoded-radius')
+  })
+})
+
+describe('the scale rules read the document scale', () => {
+  test('a step from the document scale is accepted without a binding', () => {
+    const graph = new SceneGraph()
+    const frameId = frameWithPadding(graph, 14)
+    addFloatVariable(graph, 'space/14', 14)
+
+    expect(lint(graph, frameId)).not.toContain('consistent-spacing')
+  })
+
+  test('a radius step from the document scale is accepted without a binding', () => {
+    const graph = new SceneGraph()
+    const boxId = boxWithRadius(graph, 11)
+    addFloatVariable(graph, 'radius/11', 11)
+
+    expect(lint(graph, boxId)).not.toContain('consistent-radius')
+  })
+
+  test('a value missing from the document scale is still reported', () => {
+    const graph = new SceneGraph()
+    const frameId = frameWithPadding(graph, 14)
+    addFloatVariable(graph, 'space/16', 16)
+
+    expect(lint(graph, frameId)).toContain('consistent-spacing')
+  })
+})
+
+describe('unbound spacing and radius are reported as token debt', () => {
+  test('a plain padding is reported as hardcoded', () => {
+    const graph = new SceneGraph()
+    expect(lint(graph, frameWithPadding(graph, 16))).toContain('no-hardcoded-spacing')
+  })
+
+  test('a plain radius is reported as hardcoded', () => {
+    const graph = new SceneGraph()
+    expect(lint(graph, boxWithRadius(graph, 8))).toContain('no-hardcoded-radius')
+  })
+
+  test('zero padding is not debt', () => {
+    const graph = new SceneGraph()
+    expect(lint(graph, frameWithPadding(graph, 0))).not.toContain('no-hardcoded-spacing')
   })
 })

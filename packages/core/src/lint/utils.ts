@@ -44,3 +44,19 @@ export function contrastRatio(
 }
 
 export const SPACING_SCALE = [0, 1, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96, 128]
+
+export type SpacingField =
+  | 'itemSpacing'
+  | 'paddingTop'
+  | 'paddingRight'
+  | 'paddingBottom'
+  | 'paddingLeft'
+
+/** Поля отступов и зазоров: путь привязки и подпись для сообщения. */
+export const SPACING_FIELDS: ReadonlyArray<{ field: SpacingField; label: string }> = [
+  { field: 'itemSpacing', label: 'gap' },
+  { field: 'paddingTop', label: 'paddingTop' },
+  { field: 'paddingRight', label: 'paddingRight' },
+  { field: 'paddingBottom', label: 'paddingBottom' },
+  { field: 'paddingLeft', label: 'paddingLeft' }
+]

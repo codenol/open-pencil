@@ -10,7 +10,9 @@ export default defineRule({
   check(node, context) {
     // Радиус, привязанный к переменной, уже следует шкале библиотеки.
     if (node.boundVariables.cornerRadius) return
-    if (node.cornerRadius > 0 && !SCALE.has(node.cornerRadius))
+    // Ступени `radius/…` из документа дополняют зашитый список.
+    const scale = context.numericScale('radius')
+    if (node.cornerRadius > 0 && !SCALE.has(node.cornerRadius) && !scale.has(node.cornerRadius))
       context.report({
         node,
         message: `Corner radius ${node.cornerRadius}px is not in scale`,

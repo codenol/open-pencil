@@ -86,6 +86,12 @@ export interface RuleContext {
   getConfig(): unknown
   getParent(node: LintNode): LintNode | null
   getChildren(node: LintNode): LintNode[]
+  /**
+   * Числовые ступени документа: значения FLOAT-переменных, у которых имя или
+   * коллекция начинаются с `group` (`space`, `radius`). Пустое множество, если
+   * таких переменных в документе нет.
+   */
+  numericScale(group: string): ReadonlySet<number>
 }
 
 export interface Rule {

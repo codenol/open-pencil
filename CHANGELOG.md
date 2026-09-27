@@ -6,9 +6,12 @@
 
 - Read assembled screens as templates: the assistant lists a document's screen templates, reads one screen's purpose, zones, columns with their data fields, the meaning-to-variant dictionary for statuses and badges, its slots and its checks, inserts a copy of the screen — instances, overrides and filled slots included — and fills it with data instead of assembling the same layout again.
 
+- Report spacing, gaps and corner radius that are plain numbers instead of variables with the `no-hardcoded-spacing` and `no-hardcoded-radius` rules, so a library can measure how much of its geometry still has to move onto tokens.
+
 ### Changed
 
 - Accept spacing, gaps and corner radius bound to a variable in the `consistent-spacing` and `consistent-radius` rules, so a value taken from the library's own scale is no longer reported as off-scale.
+- Read the numeric scale from the document's `space/…` and `radius/…` variables in those rules, so a step defined in the library counts even before it is bound.
 
 ## 0.15.1 — 2026-09-18
 

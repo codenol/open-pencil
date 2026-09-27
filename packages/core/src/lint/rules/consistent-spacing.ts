@@ -1,5 +1,5 @@
 import { defineRule } from '#core/lint/rule'
-import { isMultipleOf, SPACING_SCALE } from '#core/lint/utils'
+import { isMultipleOf, SPACING_FIELDS, SPACING_SCALE } from '#core/lint/utils'
 
 export default defineRule({
   meta: {
@@ -12,15 +12,13 @@ export default defineRule({
     if (node.layoutMode === 'NONE') return
     const config = context.getConfig() as { base?: number } | undefined
     const base = config?.base ?? 8
-    const valid = (value: number) => SPACING_SCALE.includes(value) || isMultipleOf(value, base)
-    const values: ReadonlyArray<[field: string, label: string, value: number]> = [
-      ['itemSpacing', 'gap', node.itemSpacing],
-      ['paddingTop', 'paddingTop', node.paddingTop],
-      ['paddingRight', 'paddingRight', node.paddingRight],
-      ['paddingBottom', 'paddingBottom', node.paddingBottom],
-      ['paddingLeft', 'paddingLeft', node.paddingLeft]
-    ]
-    for (const [field, label, value] of values) {
+    // Шкала документа (`space/…`) добавляется к зашитому списку: ступень,
+    // которую завели в библиотеке, — такая же законная, как кратная восьми.
+    const scale = context.numericScale('space')
+    const valid = (value: number) =>
+      SPACING_SCALE.includes(value) || isMultipleOf(value, base) || scale.has(value)
+    for (const { field, label } of SPACING_FIELDS) {
+      const value = node[field]
       // Значение, привязанное к переменной, уже следует шкале библиотеки:
       // проверять его на 8pt-сетку нечем и незачем.
       if (node.boundVariables[field]) continue
