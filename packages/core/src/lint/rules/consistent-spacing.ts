@@ -13,19 +13,22 @@ export default defineRule({
     const config = context.getConfig() as { base?: number } | undefined
     const base = config?.base ?? 8
     const valid = (value: number) => SPACING_SCALE.includes(value) || isMultipleOf(value, base)
-    const values = [
-      ['gap', node.itemSpacing],
-      ['paddingTop', node.paddingTop],
-      ['paddingRight', node.paddingRight],
-      ['paddingBottom', node.paddingBottom],
-      ['paddingLeft', node.paddingLeft]
-    ] as const
-    for (const [name, value] of values) {
+    const values: ReadonlyArray<[field: string, label: string, value: number]> = [
+      ['itemSpacing', 'gap', node.itemSpacing],
+      ['paddingTop', 'paddingTop', node.paddingTop],
+      ['paddingRight', 'paddingRight', node.paddingRight],
+      ['paddingBottom', 'paddingBottom', node.paddingBottom],
+      ['paddingLeft', 'paddingLeft', node.paddingLeft]
+    ]
+    for (const [field, label, value] of values) {
+      // Значение, привязанное к переменной, уже следует шкале библиотеки:
+      // проверять его на 8pt-сетку нечем и незачем.
+      if (node.boundVariables[field]) continue
       if (value > 0 && !valid(value)) {
         context.report({
           node,
-          message: `${name} ${value}px is not in spacing scale`,
-          suggest: 'Use a spacing token or 8pt-grid multiple'
+          message: `${label} ${value}px is not in spacing scale`,
+          suggest: 'Bind it to a spacing token or use an 8pt-grid multiple'
         })
       }
     }

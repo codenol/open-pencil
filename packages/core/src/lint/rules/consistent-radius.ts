@@ -8,11 +8,13 @@ export default defineRule({
   },
   match: ['RECTANGLE', 'FRAME', 'COMPONENT', 'INSTANCE'],
   check(node, context) {
+    // Радиус, привязанный к переменной, уже следует шкале библиотеки.
+    if (node.boundVariables.cornerRadius) return
     if (node.cornerRadius > 0 && !SCALE.has(node.cornerRadius))
       context.report({
         node,
         message: `Corner radius ${node.cornerRadius}px is not in scale`,
-        suggest: 'Use a radius token or a scale value'
+        suggest: 'Bind it to a radius token or use a scale value'
       })
   }
 })
